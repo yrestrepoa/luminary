@@ -56,6 +56,11 @@ r = await alice('GET', '/auth/me');
 check('me after logout 401', r.status === 401, r);
 
 r = await alice('POST', '/auth/login', { email: `alice+${tag}@example.com`, password: 'wrong-password' });
+if (r.status === 429) {
+  // El limitador es en memoria: un run previo lo agotó (ver el último check).
+  console.error('✖ Login rate limit already exhausted by a previous run: restart the API and run again.');
+  process.exit(1);
+}
 check('login wrong password 401', r.status === 401, r);
 r = await alice('POST', '/auth/login', { email: `ALICE+${tag}@example.com`, password: 'supersecret1' });
 check('login 200 (email case-insensitive)', r.status === 200, r);

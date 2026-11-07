@@ -12,7 +12,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, token, Address, Env,
+    contract, contracterror, contractevent, contractimpl, contracttype, token, Address, Env, Vec,
 };
 
 /// Ledgers per day at ~5 s per ledger.
@@ -22,6 +22,7 @@ pub const REFUND_TIMEOUT_LEDGERS: u32 = DAY_IN_LEDGERS;
 /// Escrow entries (and the contract instance) are kept alive for ~30 days after each write.
 const TTL_EXTEND_TO: u32 = 30 * DAY_IN_LEDGERS;
 const TTL_THRESHOLD: u32 = TTL_EXTEND_TO - DAY_IN_LEDGERS;
+const MAX_ORDER_PAGE_SIZE: u32 = 100;
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -41,6 +42,10 @@ pub enum Error {
     TooEarly = 6,
     /// `refund` caller is neither the buyer nor the seller.
     NotAParty = 7,
+    /// The order-list page size must be between 1 and 100.
+    InvalidLimit = 8,
+    /// The sequential order index has reached its maximum value.
+    OrderIndexFull = 9,
 }
 
 #[contracttype]
@@ -55,6 +60,7 @@ pub enum Status {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Escrow {
+    pub trade_id: u64,
     pub seller: Address,
     pub buyer: Address,
     pub token: Address,
@@ -68,6 +74,9 @@ pub struct Escrow {
 #[derive(Clone)]
 pub enum DataKey {
     Escrow(Address, u64),
+    EscrowOrder(Address, u64),
+    Order(u64),
+    NextOrder,
 }
 
 #[contractevent]
@@ -124,6 +133,15 @@ fn save(env: &Env, key: &DataKey, escrow: &Escrow) {
     env.storage()
         .persistent()
         .extend_ttl(key, TTL_THRESHOLD, TTL_EXTEND_TO);
+    let order_key = DataKey::EscrowOrder(escrow.seller.clone(), escrow.trade_id);
+    if let Some(order_id) = env.storage().persistent().get::<_, u64>(&order_key) {
+        env.storage()
+            .persistent()
+            .extend_ttl(&order_key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::Order(order_id), TTL_THRESHOLD, TTL_EXTEND_TO);
+    }
     bump_instance(env);
 }
 
@@ -150,7 +168,27 @@ impl EscrowContract {
             return Err(Error::AlreadyExists);
         }
 
+        let order_id = env
+            .storage()
+            .instance()
+            .get::<_, u64>(&DataKey::NextOrder)
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or(Error::OrderIndexFull)?;
+        env.storage()
+            .instance()
+            .set(&DataKey::NextOrder, &order_id);
+        env.storage().persistent().set(
+            &DataKey::Order(order_id),
+            &(seller.clone(), trade_id),
+        );
+        env.storage().persistent().set(
+            &DataKey::EscrowOrder(seller.clone(), trade_id),
+            &order_id,
+        );
+
         let escrow = Escrow {
+            trade_id,
             seller: seller.clone(),
             buyer: buyer.clone(),
             token: token.clone(),
@@ -246,6 +284,48 @@ impl EscrowContract {
     /// Read-only view of an escrow (used by the Luminary API to verify state).
     pub fn get_escrow(env: Env, seller: Address, trade_id: u64) -> Result<Escrow, Error> {
         load(&env, &DataKey::Escrow(seller, trade_id))
+    }
+
+    /// Number of orders indexed since this contract instance was initialized.
+    pub fn order_count(env: Env) -> u64 {
+        env.storage()
+            .instance()
+            .get(&DataKey::NextOrder)
+            .unwrap_or(0)
+    }
+
+    /// Lists retained orders beginning at the 1-based order index `start`.
+    /// `limit` bounds the number of index entries scanned and must be at most 100.
+    pub fn list_orders(env: Env, start: u64, limit: u32) -> Result<Vec<Escrow>, Error> {
+        if limit == 0 || limit > MAX_ORDER_PAGE_SIZE {
+            return Err(Error::InvalidLimit);
+        }
+
+        let count = env
+            .storage()
+            .instance()
+            .get::<_, u64>(&DataKey::NextOrder)
+            .unwrap_or(0);
+        let mut orders = Vec::new(&env);
+        let mut order_id = start.max(1);
+        let mut scanned = 0;
+        while order_id <= count && scanned < limit {
+            if let Some((seller, trade_id)) = env
+                .storage()
+                .persistent()
+                .get::<_, (Address, u64)>(&DataKey::Order(order_id))
+            {
+                if let Ok(escrow) = load(&env, &DataKey::Escrow(seller, trade_id)) {
+                    orders.push_back(escrow);
+                }
+            }
+            scanned += 1;
+            if order_id == u64::MAX {
+                break;
+            }
+            order_id += 1;
+        }
+        Ok(orders)
     }
 }
 

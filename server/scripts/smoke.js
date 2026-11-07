@@ -11,6 +11,7 @@ let failures = 0;
 function client() {
   let cookie = '';
   return async (method, path, body) => {
+    if (method === 'COOKIE') return (cookie = path ?? cookie); // leer (sin args) o fijar la cookie a mano
     const res = await fetch(API + path, {
       method,
       headers: { ...(body && { 'Content-Type': 'application/json' }), ...(cookie && { Cookie: cookie }) },
@@ -50,10 +51,20 @@ check('register validation 400 with details', r.status === 400 && r.body.details
 r = await alice('GET', '/auth/me');
 check('me 200', r.status === 200 && r.body.user.displayName === 'Alice', r);
 
+const oldCookie = await alice('COOKIE');
 r = await alice('POST', '/auth/logout');
 check('logout 204', r.status === 204, r);
 r = await alice('GET', '/auth/me');
 check('me after logout 401', r.status === 401, r);
+// Revocación en servidor: reutilizar la cookie anterior al logout debe fallar.
+await alice('COOKIE', oldCookie);
+r = await alice('GET', '/auth/me');
+check('replayed pre-logout cookie 401 (jti revoked)', r.status === 401 && oldCookie.startsWith('luminary_token='), r);
+r = await alice('POST', '/offers', { type: 'sell', currency: 'COP', price: 1, usdcAmount: 1, paymentMethod: 'Nequi' });
+check('replayed cookie cannot mutate 401', r.status === 401, r);
+await alice('COOKIE', '');
+r = await alice('GET', '/health');
+check('health reports cache backend', ['redis', 'memory'].includes(r.body.cache), r.body);
 
 r = await alice('POST', '/auth/login', { email: `alice+${tag}@example.com`, password: 'wrong-password' });
 if (r.status === 429) {

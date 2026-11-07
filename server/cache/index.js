@@ -244,6 +244,7 @@ export function createCache(url = config.redisUrl) {
           '[cache] REDIS_URL no definido: rate limit y revocación de tokens en MEMORIA del proceso ' +
             '(no se comparten entre procesos ni sobreviven a reinicios). Usa Redis en producción.'
         );
+        console.warn('[cache] ⚠ Un logout solo invalida el token en ESTE proceso; tras reiniciar, los tokens revocados vuelven a ser válidos hasta expirar.');
       }
     },
     get: (key) => backend.get(k(key)),

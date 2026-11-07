@@ -3,7 +3,8 @@ import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import { CacheRateLimitStore } from '../cache/rateLimitStore.js';
 import { one, isUniqueViolation } from '../db/pool.js';
-import { requireAuth, setAuthCookie, clearAuthCookie, USER_COLUMNS } from '../middleware/auth.js';
+import { requireAuth, setAuthCookie, clearAuthCookie, tokenPayload, USER_COLUMNS } from '../middleware/auth.js';
+import { revocations } from '../cache/revocations.js';
 import { validate } from '../utils/validation.js';
 import { conflict, unauthorized } from '../utils/http.js';
 import { toUser } from '../utils/serializers.js';
@@ -74,8 +75,15 @@ router.post('/login', loginLimiter, async (req, res) => {
   res.json({ user: toUser(user) });
 });
 
-router.post('/logout', (req, res) => {
+/**
+ * Cierra sesión: revoca el `jti` del token hasta su expiración (así una copia robada de la
+ * cookie deja de servir) y borra la cookie. Si Redis no responde, la cookie se borra igual
+ * pero se responde 503 para que el cliente sepa que el token sigue siendo válido en servidor.
+ */
+router.post('/logout', async (req, res) => {
   clearAuthCookie(res);
+  const payload = tokenPayload(req);
+  if (payload?.jti) await revocations.revoke(payload.jti, payload.exp);
   res.status(204).end();
 });
 

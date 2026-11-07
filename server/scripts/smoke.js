@@ -57,8 +57,11 @@ check('me after logout 401', r.status === 401, r);
 
 r = await alice('POST', '/auth/login', { email: `alice+${tag}@example.com`, password: 'wrong-password' });
 if (r.status === 429) {
-  // El limitador es en memoria: un run previo lo agotó (ver el último check).
-  console.error('✖ Login rate limit already exhausted by a previous run: restart the API and run again.');
+  // Un run previo agotó el limitador (ver el último check).
+  console.error(
+    "✖ Login rate limit already exhausted by a previous run: restart the API (in-memory mode) or clear it in Redis:\n" +
+      "  redis-cli --scan --pattern 'luminary:rl:*' | xargs redis-cli del"
+  );
   process.exit(1);
 }
 check('login wrong password 401', r.status === 401, r);

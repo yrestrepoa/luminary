@@ -2,6 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { pool } from './db/pool.js';
+import { cache, CacheUnavailableError } from './cache/index.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import offerRoutes from './routes/offers.js';
@@ -33,7 +34,10 @@ export function createApp() {
     } catch {
       db = 'unavailable';
     }
-    res.status(db === 'ok' ? 200 : 503).json({ status: db === 'ok' ? 'ok' : 'degraded', db });
+    // cache: 'redis' | 'memory' (sin REDIS_URL) | 'unavailable' (Redis configurado pero caído).
+    const cacheState = (await cache.ping()) ? cache.kind : 'unavailable';
+    const ok = db === 'ok' && cacheState !== 'unavailable';
+    res.status(ok ? 200 : 503).json({ status: ok ? 'ok' : 'degraded', db, cache: cacheState });
   });
 
   app.use('/api/auth', authRoutes);
@@ -47,6 +51,10 @@ export function createApp() {
   app.use((err, req, res, next) => {
     if (err instanceof HttpError) {
       return res.status(err.status).json({ error: err.message, ...(err.details && { details: err.details }) });
+    }
+    if (err instanceof CacheUnavailableError) {
+      console.error(`[cache] ${err.cause?.message ?? err.message} → 503`);
+      return res.status(503).json({ error: 'Servicio temporalmente no disponible; intenta de nuevo en unos segundos' });
     }
     if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'JSON inválido' });
     if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Cuerpo demasiado grande' });

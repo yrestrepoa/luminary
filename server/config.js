@@ -18,6 +18,8 @@ export const config = {
   port: Number(process.env.PORT ?? 4000),
   // DATABASE_URL tiene prioridad; si no está, `pg` usa PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE.
   databaseUrl: process.env.DATABASE_URL || undefined,
+  // Redis para rate limit y revocación de tokens. Vacío → memoria del proceso (solo desarrollo).
+  redisUrl: process.env.REDIS_URL || undefined,
   jwt: {
     get secret() {
       const s = required('JWT_SECRET');

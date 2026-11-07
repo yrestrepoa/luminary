@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
+import { CacheRateLimitStore } from '../cache/rateLimitStore.js';
 import { one, isUniqueViolation } from '../db/pool.js';
 import { requireAuth, setAuthCookie, clearAuthCookie, USER_COLUMNS } from '../middleware/auth.js';
 import { validate } from '../utils/validation.js';
@@ -16,9 +17,21 @@ const limiterOpts = {
   legacyHeaders: false,
   message: { error: 'Demasiados intentos. Intenta de nuevo en unos minutos.' },
 };
+// Contadores en Redis (compartidos entre procesos) o en memoria si no hay REDIS_URL.
 // 10 intentos fallidos de login por IP cada 15 min (los exitosos no cuentan).
-const loginLimiter = rateLimit({ ...limiterOpts, windowMs: 15 * 60 * 1000, limit: 10, skipSuccessfulRequests: true });
-const registerLimiter = rateLimit({ ...limiterOpts, windowMs: 60 * 60 * 1000, limit: 20 });
+const loginLimiter = rateLimit({
+  ...limiterOpts,
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  skipSuccessfulRequests: true,
+  store: new CacheRateLimitStore('rl:login:'),
+});
+const registerLimiter = rateLimit({
+  ...limiterOpts,
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  store: new CacheRateLimitStore('rl:register:'),
+});
 
 const router = Router();
 

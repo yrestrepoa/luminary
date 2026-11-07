@@ -44,13 +44,25 @@ fn setup() -> Setup<'static> {
 
     let contract = env.register(EscrowContract, ());
     let client = EscrowContractClient::new(&env, &contract);
-    Setup { env, contract, client, token, seller, buyer }
+    Setup {
+        env,
+        contract,
+        client,
+        token,
+        seller,
+        buyer,
+    }
 }
 
 impl Setup<'_> {
     fn create(&self) -> Escrow {
-        self.client
-            .create(&self.seller, &self.buyer, &self.token.address, &AMOUNT, &TRADE)
+        self.client.create(
+            &self.seller,
+            &self.buyer,
+            &self.token.address,
+            &AMOUNT,
+            &TRADE,
+        )
     }
 
     fn advance(&self, ledgers: u32) {
@@ -88,7 +100,13 @@ fn create_locks_funds_and_records_escrow() {
                 function: AuthorizedFunction::Contract((
                     s.contract.clone(),
                     Symbol::new(&s.env, "create"),
-                    (s.seller.clone(), s.buyer.clone(), s.token.address.clone(), AMOUNT, TRADE)
+                    (
+                        s.seller.clone(),
+                        s.buyer.clone(),
+                        s.token.address.clone(),
+                        AMOUNT,
+                        TRADE
+                    )
                         .into_val(&s.env),
                 )),
                 sub_invocations: std::vec![soroban_sdk::testutils::AuthorizedInvocation {
@@ -134,7 +152,10 @@ fn happy_path_release_pays_buyer() {
     assert_eq!(escrow.status, Status::Released);
     assert_eq!(s.token.balance(&s.buyer), AMOUNT);
     assert_eq!(s.token.balance(&s.contract), 0);
-    assert_eq!(s.client.get_escrow(&s.seller, &TRADE).status, Status::Released);
+    assert_eq!(
+        s.client.get_escrow(&s.seller, &TRADE).status,
+        Status::Released
+    );
 }
 
 #[test]
@@ -142,7 +163,10 @@ fn double_release_is_rejected() {
     let s = setup();
     s.create();
     s.client.release(&s.seller, &TRADE);
-    assert_eq!(s.client.try_release(&s.seller, &TRADE), Err(Ok(Error::NotFunded)));
+    assert_eq!(
+        s.client.try_release(&s.seller, &TRADE),
+        Err(Ok(Error::NotFunded))
+    );
     assert_eq!(s.token.balance(&s.buyer), AMOUNT);
 }
 
@@ -184,15 +208,18 @@ fn same_trade_id_is_independent_per_seller() {
 fn invalid_create_arguments_are_rejected() {
     let s = setup();
     assert_eq!(
-        s.client.try_create(&s.seller, &s.buyer, &s.token.address, &0, &TRADE),
+        s.client
+            .try_create(&s.seller, &s.buyer, &s.token.address, &0, &TRADE),
         Err(Ok(Error::InvalidAmount))
     );
     assert_eq!(
-        s.client.try_create(&s.seller, &s.buyer, &s.token.address, &-1, &TRADE),
+        s.client
+            .try_create(&s.seller, &s.buyer, &s.token.address, &-1, &TRADE),
         Err(Ok(Error::InvalidAmount))
     );
     assert_eq!(
-        s.client.try_create(&s.seller, &s.seller, &s.token.address, &AMOUNT, &TRADE),
+        s.client
+            .try_create(&s.seller, &s.seller, &s.token.address, &AMOUNT, &TRADE),
         Err(Ok(Error::SameParty))
     );
 }
@@ -204,15 +231,27 @@ fn create_fails_without_enough_balance() {
         .client
         .try_create(&s.seller, &s.buyer, &s.token.address, &(AMOUNT * 3), &TRADE)
         .is_err());
-    assert_eq!(s.client.try_get_escrow(&s.seller, &TRADE), Err(Ok(Error::NotFound)));
+    assert_eq!(
+        s.client.try_get_escrow(&s.seller, &TRADE),
+        Err(Ok(Error::NotFound))
+    );
 }
 
 #[test]
 fn unknown_escrow_is_not_found() {
     let s = setup();
-    assert_eq!(s.client.try_release(&s.seller, &7), Err(Ok(Error::NotFound)));
-    assert_eq!(s.client.try_refund(&s.buyer, &s.seller, &7), Err(Ok(Error::NotFound)));
-    assert_eq!(s.client.try_get_escrow(&s.seller, &7), Err(Ok(Error::NotFound)));
+    assert_eq!(
+        s.client.try_release(&s.seller, &7),
+        Err(Ok(Error::NotFound))
+    );
+    assert_eq!(
+        s.client.try_refund(&s.buyer, &s.seller, &7),
+        Err(Ok(Error::NotFound))
+    );
+    assert_eq!(
+        s.client.try_get_escrow(&s.seller, &7),
+        Err(Ok(Error::NotFound))
+    );
 }
 
 // ------------------------------------------------------------------ authorization
@@ -228,7 +267,13 @@ fn create_requires_seller_auth() {
             invoke: &MockAuthInvoke {
                 contract: &s.contract,
                 fn_name: "create",
-                args: (s.seller.clone(), s.buyer.clone(), s.token.address.clone(), AMOUNT, TRADE)
+                args: (
+                    s.seller.clone(),
+                    s.buyer.clone(),
+                    s.token.address.clone(),
+                    AMOUNT,
+                    TRADE,
+                )
                     .into_val(&s.env),
                 sub_invokes: &[],
             },
@@ -256,7 +301,10 @@ fn buyer_cannot_release() {
         .try_release(&s.seller, &TRADE);
     assert!(res.is_err());
     assert_eq!(s.token.balance(&s.buyer), 0);
-    assert_eq!(s.client.get_escrow(&s.seller, &TRADE).status, Status::Funded);
+    assert_eq!(
+        s.client.get_escrow(&s.seller, &TRADE).status,
+        Status::Funded
+    );
 }
 
 #[test]
@@ -331,7 +379,10 @@ fn buyer_can_refund_any_time() {
     assert_eq!(escrow.status, Status::Refunded);
     assert_eq!(s.token.balance(&s.seller), AMOUNT * 2);
     assert_eq!(s.token.balance(&s.contract), 0);
-    assert_eq!(s.client.try_release(&s.seller, &TRADE), Err(Ok(Error::NotFunded)));
+    assert_eq!(
+        s.client.try_release(&s.seller, &TRADE),
+        Err(Ok(Error::NotFunded))
+    );
 }
 
 #[test]

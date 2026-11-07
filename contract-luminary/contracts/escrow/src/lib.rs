@@ -116,10 +116,7 @@ fn bump_instance(env: &Env) {
 }
 
 fn load(env: &Env, key: &DataKey) -> Result<Escrow, Error> {
-    env.storage()
-        .persistent()
-        .get(key)
-        .ok_or(Error::NotFound)
+    env.storage().persistent().get(key).ok_or(Error::NotFound)
 }
 
 fn save(env: &Env, key: &DataKey, escrow: &Escrow) {

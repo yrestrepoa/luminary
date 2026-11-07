@@ -41,7 +41,7 @@ Before the first deploy
 
 - [ ] Secrets generated (not reused from dev): `JWT_SECRET`, PostgreSQL and Redis passwords → [Secrets](#secrets-management).
 - [ ] `NODE_ENV=production`. The API refuses to start unless `REDIS_URL`, `ESCROW_CONTRACT_ID`, an `https://` `PUBLIC_ORIGIN` and `VERIFY_STELLAR_TX=true` are set and no example password is used.
-- [ ] TLS terminated by a reverse proxy; `TRUST_PROXY` set to that proxy (never `true`) → [Proxy](#reverse-proxy-and-tls).
+- [ ] TLS terminated by a reverse proxy that **overwrites** `X-Forwarded-For`; `TRUST_PROXY` set to that proxy's hop count or IP (never `true`) → [Proxy](#reverse-proxy-and-tls).
 - [ ] PostgreSQL ≥ 13 with automated backups **and a tested restore** → [Backups](#backups-and-restore).
 - [ ] Redis with AOF persistence, a password, `maxmemory-policy noeviction`, not reachable from the Internet → [Redis](#redis).
 - [ ] `npm run db:migrate` (or the compose `migrate` service) runs before the new API version receives traffic.
@@ -71,7 +71,9 @@ CLI tools (`npm run db:migrate`) only need the database variables.
 | `HOST` / `PORT` | `127.0.0.1` / `4000` | `0.0.0.0` in containers | Listen address. |
 | `PUBLIC_ORIGIN` | – | **required**, `https://` | Public URL of the SPA. Mutating requests from any other `Origin` get 403. `http://localhost` is accepted for local production-mode runs. |
 | `CORS_ORIGINS` | – | usually empty | Comma-separated extra origins that get CORS headers with credentials. Only needed if the SPA is served from another origin of the same site. |
-| `TRUST_PROXY` | `loopback` | proxy IP/subnet or hop count | Value for Express `trust proxy`. Determines the client IP used by the login rate limit. `true` is rejected. |
+| `TRUST_PROXY` | `loopback` (dev) / `false` (production) | hop count or proxy IP/CIDR | Value for Express `trust proxy`, validated at boot: `false`/`0`, a hop count `1`–`10`, or a comma list of IPs, CIDRs, `loopback`, `linklocal`, `uniquelocal`. `true` and anything else are rejected. Determines the client IP used by the per-IP login/register limits. In production it defaults to `false` (`X-Forwarded-For` ignored) and the API logs a warning until it is set. Compose sets `1`. See the [proxy contract](#reverse-proxy-and-tls). |
+| `PENDING_TRADE_TTL_MINUTES` | `30` | | A trade that was taken but never funded is cancelled automatically (`cancelReason: "expired"`) after this many minutes and its USDC goes back to the offer. `0` disables expiry. |
+| `TRADE_EXPIRY_INTERVAL_SECONDS` | `60` | | How often each API process runs the expiry sweep (5–3600). Safe with several replicas. |
 | `BODY_LIMIT` | `20kb` | | Max JSON body size (larger → 413). |
 | `STATIC_DIR` | – (image: `/app/dist`) | | Serve the built SPA from the API (hashed assets cached 1 year, `index.html` `no-cache`, client-side routing fallback). |
 | `SHUTDOWN_TIMEOUT_MS` | `10000` | < orchestrator grace period | Max time to drain in-flight requests after `SIGTERM`. |
@@ -85,7 +87,7 @@ CLI tools (`npm run db:migrate`) only need the database variables.
 | `DB_IDLE_TIMEOUT_MS` | `30000` | | Close idle pool connections. |
 | `REDIS_URL` | – (memory) | **required** | `redis://:password@host:6379` (`rediss://` for TLS). If set and Redis is down, login/register and authenticated routes return 503 (fail-closed). |
 | `ESCROW_CONTRACT_ID` | – | **required** | Deployed `luminary-escrow` contract (`C…`). |
-| `VERIFY_STELLAR_TX` | `true` | must be `true` | `false` only for local smoke tests with fake hashes. |
+| `VERIFY_STELLAR_TX` | `true` | must be `true` | `true` or `false` (any other value is a boot error). `false` only for local smoke tests with fake hashes; refused in production. |
 | `SOROBAN_RPC_URL` | testnet SDF RPC | required on mainnet | Used to verify escrow transactions. |
 | `STELLAR_NETWORK_PASSPHRASE` | Testnet | mainnet passphrase on mainnet | `Public Global Stellar Network ; September 2015`. |
 | `USDC_ISSUER` | Circle **testnet** issuer | required on mainnet | Escrow token = the SAC of `USDC:<issuer>`. |
@@ -145,11 +147,30 @@ Terminate TLS at a reverse proxy (nginx, Caddy, Traefik, a cloud load balancer).
 
 - Redirect HTTP → HTTPS and send HSTS (the API also sends it in production).
 - Pass `Host`, `X-Forwarded-For`, `X-Forwarded-Proto` and, ideally, `X-Request-Id` (the API reuses a safe incoming id and echoes it in the response, so proxy and API logs correlate).
-- Set `TRUST_PROXY` to exactly the proxy hop(s). The login rate limit keys on `req.ip`; if `TRUST_PROXY`
-  is too permissive a client can spoof `X-Forwarded-For` and bypass it, if too strict every user shares the proxy's IP (and one attacker locks everyone out). Examples:
-  - proxy on the same host, API on loopback → `loopback` (default)
-  - proxy container in the compose network → `uniquelocal` (private ranges) or its subnet, e.g. `172.18.0.0/16`
-  - one cloud load balancer in front → `1`
+
+### Proxy contract (`X-Forwarded-For` and `TRUST_PROXY`)
+
+The per-IP login/register limits key on `req.ip`, which Express derives from `X-Forwarded-For` only for
+the hops listed in `TRUST_PROXY`. Two rules, both required:
+
+1. **The edge proxy must overwrite `X-Forwarded-For` with the address it sees**, never append to a
+   client-supplied value. nginx: `proxy_set_header X-Forwarded-For $remote_addr;` (not
+   `$proxy_add_x_forwarded_for`). Caddy, Traefik and cloud load balancers *append*: with them, trust exactly
+   their hop count so that only the entry they appended is used.
+2. **`TRUST_PROXY` = exactly the proxies in front of the API**, never more:
+   - one reverse proxy (on the same host in front of the compose stack, or a single cloud load balancer) → `1` (compose default)
+   - proxy on the same host talking to a bare `node server/index.js` on loopback → `loopback`
+   - proxy container in the compose network → its IP or subnet, e.g. `172.18.0.0/16`
+   - CDN → load balancer → API → `2`
+   - no proxy (API directly exposed — not recommended) → `false`
+
+If `TRUST_PROXY` is too permissive, a client can rotate `X-Forwarded-For` and get a fresh per-IP budget on
+every request; if too strict, every user shares the proxy's IP and one abuser locks everybody out. The
+production default is `false` (safe, but the second failure mode), so set it. Independently of the proxy
+setup, failed logins are also limited **per account** (lowercased email, 10 per 15 min, stored as a SHA-256
+hash), so rotating IPs does not help brute-forcing one account. The API port must only be reachable through
+the proxy (compose publishes it on `127.0.0.1` only); anyone who can reach it directly can choose the
+`X-Forwarded-For` value the API trusts.
 - Keep the proxy's upstream keep-alive timeout **below** the API's `keepAliveTimeout` (65 s).
 - The API limits bodies to `BODY_LIMIT`; set the proxy limit similarly (`client_max_body_size 32k`).
 
@@ -168,7 +189,7 @@ server {
     proxy_http_version 1.1;
     proxy_set_header Connection "";
     proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-For $remote_addr;   # overwrite, never append the client's value
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header X-Request-Id $request_id;
     proxy_read_timeout 35s;
@@ -177,7 +198,8 @@ server {
 server { listen 80; server_name luminary.example.com; return 301 https://$host$request_uri; }
 ```
 
-With this setup `PUBLIC_ORIGIN=https://luminary.example.com` and `TRUST_PROXY=loopback`.
+With this setup `PUBLIC_ORIGIN=https://luminary.example.com` and `TRUST_PROXY=1` (nginx → Docker's
+published port: the API sees the Docker gateway as the peer, so `loopback` would not match).
 
 ## PostgreSQL
 
@@ -226,7 +248,8 @@ source of truth for funds; the DB maps them to users and trades, so losing it me
 
 ## Redis
 
-Stores only security state: login/register rate-limit counters (`luminary:rl:*`, TTL 15–60 min) and
+Stores only security state: login/register rate-limit counters (`luminary:rl:*`, per IP and per hashed
+account email, TTL 15–60 min) and
 revoked JWT ids (`luminary:revoked:jti:*`, TTL ≤ 7 days). Memory use is small (hundreds of bytes per key).
 
 - **Persistence:** AOF with `appendfsync everysec` (+ RDB snapshots), as in `docker-compose.yml`. Without persistence a Redis restart silently un-revokes logged-out tokens until they expire.
@@ -299,7 +322,7 @@ The testnet contract `CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI` 
      --wasm target/wasm32v1-none/release/luminary_escrow.wasm
    ```
    Verify the deployed WASM hash on an explorer. The contract has no admin, so the deployer key holds no power afterwards.
-5. **USDC.** Use Circle's mainnet USDC issuer — `GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN` at the time of writing; **verify it against Circle's official documentation** before use. Its Stellar Asset Contract id is derived automatically from `USDC_ISSUER` + network passphrase; check it matches the SAC listed on an explorer.
+5. **USDC.** Use Circle's mainnet USDC issuer. The value `GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN` was written from memory and is **unverified: verify it against Circle's official documentation before use** (a wrong issuer means a worthless or attacker-controlled token). Its Stellar Asset Contract id is derived automatically from `USDC_ISSUER` + network passphrase; check it matches the SAC listed on an explorer.
 6. **Server env:** `STELLAR_NETWORK_PASSPHRASE="Public Global Stellar Network ; September 2015"`, `SOROBAN_RPC_URL=<mainnet RPC>` (SDF does not run a public mainnet RPC: use a provider or your own `stellar-rpc`), `USDC_ISSUER=<Circle mainnet issuer>`, `ESCROW_CONTRACT_ID=<new id>`, `VERIFY_STELLAR_TX=true`. The API refuses mainnet without explicit issuer and RPC.
 7. **Frontend build:** `VITE_STELLAR_NETWORK=mainnet`, `VITE_SOROBAN_RPC_URL`, `VITE_HORIZON_URL` (if not `horizon.stellar.org`), `VITE_USDC_ISSUER`; add custom endpoints to `CSP_CONNECT_SRC`. Freighter must be on Mainnet (the app checks the passphrase).
 8. **Data:** start mainnet with a fresh database, or close every testnet trade first — trades store the contract id they were funded with, and testnet hashes cannot be verified on mainnet.
@@ -311,9 +334,14 @@ The testnet contract `CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI` 
 - **Seller reclaim timeout.** After `refund_after_ledger` (~24 h of ledgers) the seller can reclaim the USDC on their own, **even if the buyer already paid fiat**. Buyers must pay promptly after `funded`; sellers must release promptly. The timeout is fixed in the contract.
 - **No dispute resolution.** `disputed` is only a Luminary status; nobody can move escrowed funds except the parties per the contract rules. There is no arbiter, evidence flow or admin override.
 - **Unregistered deposits.** If a seller funds the escrow on-chain but never registers the tx hash with the API (and the trade is cancelled), the funds sit in the contract until the seller reclaims after the timeout or the buyer refunds. The API does not scan the chain for orphaned escrows.
+- **Pending-trade expiry.** A trade taken but not funded within `PENDING_TRADE_TTL_MINUTES` (30) is cancelled with `cancelReason: "expired"` and its USDC is returned to the offer, so throwaway accounts cannot park a competitor's liquidity. A sweep runs in every API process; a Postgres advisory lock plus a conditional `UPDATE … WHERE status = 'pending'` that restores liquidity only for the rows it changed make it safe with many replicas and against concurrent cancels or funding. With `VERIFY_STELLAR_TX=true` the sweep first checks `get_escrow` and skips trades that are already funded on-chain but not yet registered (and postpones expiry if the RPC is down). A seller who deposits in the last seconds before expiry can still race it; their USDC stays refundable via the contract. A per-user cap on open takes is not implemented.
+- **Disputes and refunds.** In `disputed`, the API accepts a refund reported by the seller only if the on-chain `refund` was made by the seller at or after `refund_after_ledger` (or was made by the buyer). Without on-chain verification (dev only) it applies the same ~24 h rule from `funded_at`. This mirrors the contract; it is not an arbitration mechanism.
+- **Account enumeration (audit M2, accepted).** `POST /api/auth/register` answers `409 "Ya existe una cuenta con ese email"` for a taken email. Kept for usability because there is no email-verification flow that would allow a generic answer. Registration is limited per IP and login per account. Linking a Stellar address that another account uses gets a generic `409` that does not confirm the linkage; the status code itself still differs from success until address ownership is proven (L2 below).
+- **Per-account login limit.** 10 failed logins per account per 15 min, on top of 10 per IP. An attacker who knows an email can keep that account locked out of login (not out of existing sessions) for as long as they keep failing. This is the accepted price of not allowing distributed brute force.
 - **Fiat is off-chain and unverified.** "paid" is the buyer's claim; there is no payment-provider integration.
 - **Single JWT key, 7-day sessions**, no refresh tokens, no session list/"log out everywhere", no 2FA, no email verification or password reset.
 - **Rate limiting** covers login/register only; other routes rely on the proxy for global limits.
+- **No proof of Stellar address ownership (audit L2, follow-up).** A user can link any valid `G…` address. This mostly harms the claimant (USDC goes to the real key holder), but it lets someone squat an address so its real owner cannot link it. Planned fix: a signature challenge (sign a server nonce with the account key via Freighter `signMessage`/SEP-53) before linking, plus a reclaim path that overrides a squatter who cannot sign. Not implemented yet because it needs UX decisions (wallet support for message signing, migration of already-linked addresses, recovery flow).
 - **Pre-escrow trades** (from before migration 002) can only be cancelled.
 - **Frontend tests** cover logic, guards and key components; the trade and wallet views have no automated UI tests (manual/e2e testing required).
 
@@ -323,4 +351,5 @@ The testnet contract `CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI` 
 2. Product/legal decisions: dispute handling, refund timeout, KYC/AML and licensing per fiat corridor, terms of service.
 3. Infrastructure choice and provisioning (hosting, managed Postgres with PITR, managed Redis, TLS, log shipping, alerting) — none is configured by this repository.
 4. Real secrets in a secret manager, and a restore drill of the backup procedure.
-5. Load test of the trade endpoints and the bcrypt cost (12 rounds ≈ 250 ms CPU per login/register) on the target hardware.
+5. Address ownership proof (L2 above) before onboarding real users.
+6. Load test of the trade endpoints and the bcrypt cost (12 rounds ≈ 250 ms CPU per login/register) on the target hardware.

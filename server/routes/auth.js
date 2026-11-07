@@ -81,6 +81,9 @@ router.post('/register', registerLimiter, async (req, res) => {
       [email, hash, displayName]
     );
   } catch (err) {
+    // Auditoría M2 (aceptado): este 409 revela que el email tiene cuenta. Se mantiene por usabilidad
+    // (no hay verificación de email con la que responder de forma genérica); lo mitigan el límite
+    // de registro por IP y el de login por cuenta. Ver docs/PRODUCTION.md → Known limits.
     if (isUniqueViolation(err, 'users_email_lower_key')) throw conflict('Ya existe una cuenta con ese email');
     throw err;
   }

@@ -92,6 +92,15 @@ describeIntegration('auth', (ctx) => {
     spy.mockRestore();
   });
 
+  it('answers a Stellar address conflict generically, without confirming the linkage (audit M2)', async () => {
+    const owner = await registerUser(ctx.app, { name: 'Owner' });
+    const { agent } = await registerUser(ctx.app, { name: 'Prober', address: false });
+    const res = await agent.patch('/api/users/me').send({ stellarAddress: owner.user.stellarAddress }).expect(409);
+    expect(res.body).toEqual({ error: 'No se pudo vincular esa dirección Stellar' });
+    expect(JSON.stringify(res.body)).not.toMatch(/otra cuenta|vinculada|ya existe/i);
+    expect((await agent.get('/api/auth/me').expect(200)).body.user.stellarAddress).toBeNull();
+  });
+
   it('rate-limits failed logins per client IP (10 per 15 min); successful logins do not count', async () => {
     const { email, password } = await registerUser(ctx.app, { address: false });
     // Desde loopback (proxy de confianza por defecto) se respeta X-Forwarded-For: cada "cliente" tiene su cupo.

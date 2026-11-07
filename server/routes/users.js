@@ -34,8 +34,11 @@ router.patch('/me', requireAuth, async (req, res) => {
       ]
     );
   } catch (err) {
+    // Auditoría M2: mensaje genérico, sin confirmar que la dirección pertenece a otra cuenta
+    // (evita usar este endpoint para saber si una dirección on-chain es usuaria de Luminary).
+    // Residual: el 409 sigue distinguiéndose de un 200; cerrarlo requiere prueba de propiedad (L2).
     if (isUniqueViolation(err, 'users_stellar_address_key')) {
-      throw conflict('Esa dirección Stellar ya está vinculada a otra cuenta');
+      throw conflict('No se pudo vincular esa dirección Stellar');
     }
     throw err;
   }

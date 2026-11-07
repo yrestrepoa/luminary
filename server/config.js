@@ -1,58 +1,242 @@
-import 'dotenv/config';
+// Configuración de la API leída de variables de entorno y validada al arrancar (fail fast).
+//
+// loadConfig() es pura (recibe el entorno) para poder probarla; `config` es la instancia
+// usada por la app. Si algo es inválido se lanza ConfigError con TODOS los problemas a la vez.
+import dotenv from 'dotenv';
 import { Asset, Networks, StrKey } from '@stellar/stellar-sdk';
 
-/** Lee una variable de entorno obligatoria (falla al arrancar si falta). */
-function required(name) {
-  const value = process.env[name];
-  if (value === undefined || value === '') {
-    throw new Error(`Falta la variable de entorno ${name} (ver .env.example)`);
+// En tests el entorno lo fija la suite; .env (si existe) solo se carga fuera de NODE_ENV=test.
+if (process.env.NODE_ENV !== 'test') dotenv.config({ quiet: true });
+
+export const NODE_ENVS = ['development', 'test', 'production'];
+export const DEFAULT_USDC_ISSUER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5'; // Circle, testnet
+const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'];
+
+// Valores de ejemplo/plantilla que nunca deben llegar a un despliegue.
+const PLACEHOLDER_RE =
+  /replace[-_ ]?with|change[-_ ]?me|changeme|placeholder|your[-_ ]?secret|example|^(secret|password)$|x{6,}/i;
+export const MIN_JWT_SECRET_LENGTH = 32;
+export const MIN_JWT_SECRET_BITS = 128;
+
+export class ConfigError extends Error {
+  constructor(problems) {
+    super(`Configuración inválida:\n  - ${problems.join('\n  - ')}`);
+    this.name = 'ConfigError';
+    this.problems = problems;
+  }
+}
+
+/** Entropía estimada (bits) de `s` según la frecuencia de sus caracteres (Shannon × longitud). */
+export function estimateEntropyBits(s) {
+  if (!s) return 0;
+  const freq = new Map();
+  for (const ch of s) freq.set(ch, (freq.get(ch) ?? 0) + 1);
+  let perChar = 0;
+  for (const n of freq.values()) {
+    const p = n / s.length;
+    perChar -= p * Math.log2(p);
+  }
+  return perChar * s.length;
+}
+
+export const looksLikePlaceholder = (value) => PLACEHOLDER_RE.test(value);
+
+/** Problemas de un JWT_SECRET (vacío = válido). */
+export function jwtSecretProblems(secret) {
+  if (!secret) return ['Falta JWT_SECRET (genera uno: openssl rand -hex 48)'];
+  const out = [];
+  if (secret.length < MIN_JWT_SECRET_LENGTH)
+    out.push(`JWT_SECRET debe tener al menos ${MIN_JWT_SECRET_LENGTH} caracteres`);
+  if (looksLikePlaceholder(secret)) out.push('JWT_SECRET parece un valor de ejemplo; genera uno aleatorio');
+  else if (estimateEntropyBits(secret) < MIN_JWT_SECRET_BITS) {
+    out.push(`JWT_SECRET tiene muy poca entropía (< ${MIN_JWT_SECRET_BITS} bits); usa: openssl rand -hex 48`);
+  }
+  return out;
+}
+
+/**
+ * TRUST_PROXY → valor de `app.set('trust proxy')`. Acepta: false | número de saltos |
+ * lista separada por comas de IPs/subredes o 'loopback' | 'linklocal' | 'uniquelocal'.
+ * 'true' (confiar en cualquiera) se rechaza: permitiría falsear X-Forwarded-For y saltarse el rate limit.
+ */
+export function parseTrustProxy(raw) {
+  const v = (raw ?? '').trim();
+  if (v === '') return { value: 'loopback' };
+  if (v === 'false') return { value: false };
+  if (v === 'true') {
+    return { error: 'TRUST_PROXY=true confía en cualquier X-Forwarded-For (rate limit evitable); indica saltos o IPs' };
+  }
+  if (/^\d+$/.test(v)) return { value: Number(v) };
+  return {
+    value: v
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  };
+}
+
+/** Lista de orígenes `scheme://host[:port]` separada por comas. */
+function parseOrigins(raw, name, problems) {
+  const out = [];
+  for (const item of (raw ?? '').split(',').map((s) => s.trim())) {
+    if (!item) continue;
+    try {
+      const u = new URL(item);
+      if (!['http:', 'https:'].includes(u.protocol) || u.origin !== item.replace(/\/$/, '')) throw new Error();
+      out.push(u.origin);
+    } catch {
+      problems.push(`${name}: "${item}" no es un origen válido (p.ej. https://app.example.com)`);
+    }
+  }
+  return out;
+}
+
+function int(env, name, def, { min, max }, problems) {
+  const raw = env[name];
+  if (raw === undefined || raw === '') return def;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < min || n > max) {
+    problems.push(`${name} debe ser un entero entre ${min} y ${max}`);
+    return def;
+  }
+  return n;
+}
+
+function contractId(env, name, problems) {
+  const value = env[name];
+  if (!value) return null;
+  if (!StrKey.isValidContract(value)) {
+    problems.push(`${name} no es un id de contrato Stellar válido (C…)`);
+    return null;
   }
   return value;
 }
 
-const NODE_ENV = process.env.NODE_ENV ?? 'development';
+/** Lee y valida la configuración. Lanza ConfigError con todos los problemas encontrados. */
+export function loadConfig(env = process.env) {
+  const problems = []; // errores de formato: invalidan cualquier uso (API, migraciones, scripts)
+  const serverProblems = []; // requisitos para servir tráfico (secretos, producción): assertServerConfig()
+  const nodeEnv = env.NODE_ENV || 'development';
+  if (!NODE_ENVS.includes(nodeEnv)) problems.push(`NODE_ENV debe ser uno de: ${NODE_ENVS.join(', ')}`);
+  const isProd = nodeEnv === 'production';
 
-export const config = {
-  env: NODE_ENV,
-  isProd: NODE_ENV === 'production',
-  host: process.env.HOST ?? '127.0.0.1',
-  port: Number(process.env.PORT ?? 4000),
-  // DATABASE_URL tiene prioridad; si no está, `pg` usa PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE.
-  databaseUrl: process.env.DATABASE_URL || undefined,
-  // Redis para rate limit y revocación de tokens. Vacío → memoria del proceso (solo desarrollo).
-  redisUrl: process.env.REDIS_URL || undefined,
-  jwt: {
-    get secret() {
-      const s = required('JWT_SECRET');
-      if (s.length < 32) throw new Error('JWT_SECRET debe tener al menos 32 caracteres');
-      return s;
-    },
-    expiresIn: '7d',
-    maxAgeMs: 7 * 24 * 60 * 60 * 1000,
-  },
-  cookieName: 'luminary_token',
-  stellar: {
-    networkPassphrase: process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET,
-    rpcUrl: process.env.SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org',
-    usdcIssuer: process.env.USDC_ISSUER || 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
-    // Contrato luminary-escrow desplegado (contract-luminary/contracts/escrow). Sin él no se puede fondear.
-    escrowContractId: optionalContractId('ESCROW_CONTRACT_ID'),
-    // Token del escrow: el SAC de USDC por defecto; ESCROW_TOKEN_ID permite otro SAC (pruebas).
-    get escrowTokenId() {
-      return (
-        optionalContractId('ESCROW_TOKEN_ID') ?? new Asset('USDC', this.usdcIssuer).contractId(this.networkPassphrase)
-      );
-    },
-    // Verifica on-chain (Soroban RPC) el escrow antes de cambiar el estado de un trade.
-    // false solo para pruebas locales sin red (npm run test:smoke usa hashes ficticios).
-    verifyTx: (process.env.VERIFY_STELLAR_TX ?? 'true') !== 'false',
-  },
-};
+  const jwtSecret = env.JWT_SECRET ?? '';
+  serverProblems.push(...jwtSecretProblems(jwtSecret));
 
-/** Lee un id de contrato C… opcional; falla al arrancar si tiene formato inválido. */
-function optionalContractId(name) {
-  const value = process.env[name];
-  if (!value) return null;
-  if (!StrKey.isValidContract(value)) throw new Error(`${name} no es un id de contrato Stellar válido (C…)`);
-  return value;
+  const logLevel = env.LOG_LEVEL || (nodeEnv === 'test' ? 'silent' : 'info');
+  if (!LOG_LEVELS.includes(logLevel)) problems.push(`LOG_LEVEL debe ser uno de: ${LOG_LEVELS.join(', ')}`);
+
+  const trustProxy = parseTrustProxy(env.TRUST_PROXY);
+  if (trustProxy.error) problems.push(trustProxy.error);
+
+  const databaseUrl = env.DATABASE_URL || undefined;
+  const redisUrl = env.REDIS_URL || undefined;
+  const verifyTx = (env.VERIFY_STELLAR_TX ?? 'true') !== 'false';
+  const escrowContractId = contractId(env, 'ESCROW_CONTRACT_ID', problems);
+  const escrowTokenOverride = contractId(env, 'ESCROW_TOKEN_ID', problems);
+  const usdcIssuer = env.USDC_ISSUER || DEFAULT_USDC_ISSUER;
+  if (!StrKey.isValidEd25519PublicKey(usdcIssuer)) problems.push('USDC_ISSUER no es una cuenta Stellar válida (G…)');
+  const networkPassphrase = env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET;
+
+  if (networkPassphrase === Networks.PUBLIC) {
+    // Mainnet: los valores por defecto (USDC y RPC de testnet) serían incorrectos.
+    if (!env.USDC_ISSUER && !escrowTokenOverride) {
+      problems.push('Mainnet: define USDC_ISSUER (emisor de USDC de mainnet) o ESCROW_TOKEN_ID');
+    }
+    if (!env.SOROBAN_RPC_URL) problems.push('Mainnet: define SOROBAN_RPC_URL (el valor por defecto es de testnet)');
+  }
+
+  const publicOrigin = parseOrigins(env.PUBLIC_ORIGIN, 'PUBLIC_ORIGIN', problems)[0];
+  const corsOrigins = parseOrigins(env.CORS_ORIGINS, 'CORS_ORIGINS', problems);
+  const cspConnectSrc = parseOrigins(env.CSP_CONNECT_SRC, 'CSP_CONNECT_SRC', problems);
+
+  if (isProd) {
+    // En producción nada de valores por defecto "de desarrollo".
+    if (!databaseUrl && !env.PGHOST) serverProblems.push('Producción: define DATABASE_URL (o PGHOST/PGUSER/…)');
+    if (databaseUrl && looksLikePlaceholder(databaseUrl)) {
+      serverProblems.push('Producción: DATABASE_URL contiene una contraseña de ejemplo');
+    }
+    if (env.PGPASSWORD && looksLikePlaceholder(env.PGPASSWORD)) {
+      serverProblems.push('Producción: PGPASSWORD es un valor de ejemplo');
+    }
+    if (!redisUrl)
+      serverProblems.push('Producción: define REDIS_URL (rate limit y revocación compartidos entre procesos)');
+    if (!verifyTx)
+      serverProblems.push('Producción: VERIFY_STELLAR_TX=false no está permitido (verificación on-chain obligatoria)');
+    if (!escrowContractId) serverProblems.push('Producción: define ESCROW_CONTRACT_ID');
+    if (!publicOrigin) serverProblems.push('Producción: define PUBLIC_ORIGIN (URL pública https:// de la app)');
+    else if (!publicOrigin.startsWith('https://') && !/^http:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(publicOrigin)) {
+      serverProblems.push('Producción: PUBLIC_ORIGIN debe ser https:// (las cookies de sesión son Secure)');
+    }
+  }
+
+  const cfg = {
+    env: nodeEnv,
+    isProd,
+    isTest: nodeEnv === 'test',
+    host: env.HOST || '127.0.0.1',
+    port: int(env, 'PORT', 4000, { min: 0, max: 65535 }, problems),
+    logLevel,
+    trustProxy: trustProxy.value,
+    // Origen público de la SPA (p.ej. https://luminary.example). Las peticiones con Origin
+    // distinto del propio host, PUBLIC_ORIGIN o CORS_ORIGINS se rechazan en métodos mutantes.
+    publicOrigin: publicOrigin ?? null,
+    corsOrigins,
+    // Orígenes extra para connect-src de la CSP (Horizon/RPC propios si la SPA usa otros).
+    cspConnectSrc,
+    bodyLimit: env.BODY_LIMIT || '20kb',
+    // Carpeta del build de Vite (dist/) para servir la SPA desde la API. Vacío = solo API.
+    staticDir: env.STATIC_DIR || null,
+    shutdownTimeoutMs: int(env, 'SHUTDOWN_TIMEOUT_MS', 10_000, { min: 0, max: 120_000 }, problems),
+    // DATABASE_URL tiene prioridad; si no está, `pg` usa PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE.
+    databaseUrl,
+    db: {
+      max: int(env, 'DB_POOL_MAX', 10, { min: 1, max: 200 }, problems),
+      idleTimeoutMs: int(env, 'DB_IDLE_TIMEOUT_MS', 30_000, { min: 0, max: 3_600_000 }, problems),
+      connectionTimeoutMs: int(env, 'DB_CONNECTION_TIMEOUT_MS', 5_000, { min: 0, max: 60_000 }, problems),
+      statementTimeoutMs: int(env, 'DB_STATEMENT_TIMEOUT_MS', 10_000, { min: 0, max: 600_000 }, problems),
+    },
+    // Redis para rate limit y revocación de tokens. Vacío → memoria del proceso (solo desarrollo).
+    redisUrl,
+    jwt: {
+      secret: jwtSecret,
+      expiresIn: '7d',
+      maxAgeMs: 7 * 24 * 60 * 60 * 1000,
+    },
+    cookieName: 'luminary_token',
+    // Cookies Secure en producción (requiere HTTPS delante; localhost es contexto seguro).
+    cookieSecure: isProd,
+    stellar: {
+      networkPassphrase,
+      rpcUrl: env.SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org',
+      usdcIssuer,
+      // Contrato luminary-escrow desplegado (contract-luminary/contracts/escrow). Sin él no se puede fondear.
+      escrowContractId,
+      // Token del escrow: el SAC de USDC por defecto; ESCROW_TOKEN_ID permite otro SAC (pruebas).
+      escrowTokenId:
+        escrowTokenOverride ??
+        (StrKey.isValidEd25519PublicKey(usdcIssuer)
+          ? new Asset('USDC', usdcIssuer).contractId(networkPassphrase)
+          : null),
+      // Verifica on-chain (Soroban RPC) el escrow antes de cambiar el estado de un trade.
+      // false solo para pruebas locales sin red (npm run test:smoke usa hashes ficticios).
+      verifyTx,
+    },
+  };
+
+  if (problems.length) throw new ConfigError(problems);
+  cfg.serverProblems = serverProblems;
+  return cfg;
 }
+
+/**
+ * Requisitos para arrancar la API (JWT_SECRET fuerte, y en producción: Redis, escrow
+ * verificado, PUBLIC_ORIGIN https, sin contraseñas de ejemplo). Las herramientas de línea de
+ * comandos (migraciones, scripts) no los necesitan y solo usan loadConfig().
+ */
+export function assertServerConfig(cfg = config) {
+  if (cfg.serverProblems.length) throw new ConfigError(cfg.serverProblems);
+}
+
+/** Configuración de la app (validada al importar: un error aquí detiene el arranque). */
+export const config = loadConfig();

@@ -19,7 +19,7 @@ export function signToken(userId) {
 export const cookieOptions = () => ({
   httpOnly: true,
   sameSite: 'strict',
-  secure: config.isProd,
+  secure: config.cookieSecure,
   path: '/',
 });
 

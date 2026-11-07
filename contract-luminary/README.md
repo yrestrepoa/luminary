@@ -31,9 +31,11 @@ This repository uses the recommended structure for a Soroban project:
 | `create(seller, buyer, token, amount: i128, trade_id: u64) -> Escrow` | `seller` | Transfers `amount` of `token` from `seller` into the contract. Fails if `(seller, trade_id)` already exists, if `amount <= 0`, or if `seller == buyer`. |
 | `release(seller, trade_id) -> Escrow` | `seller` | Sends the escrowed amount to the buyer. Status becomes `Released`. |
 | `refund(caller, seller, trade_id) -> Escrow` | `caller` | Returns the amount to the seller. `caller` is either the **buyer** (any time) or the **seller**, and the seller may only do it once `refund_after_ledger` is reached (created ledger + 17 280 ledgers ≈ 24 h). Status becomes `Refunded`. |
-| `get_escrow(seller, trade_id) -> Escrow` | – | Read-only view: `{ seller, buyer, token, amount, refund_after_ledger, status }`, where `status` is `0` Funded, `1` Released, or `2` Refunded. |
+| `get_escrow(seller, trade_id) -> Escrow` | – | Read-only view: `{ trade_id, seller, buyer, token, amount, refund_after_ledger, status }`, where `status` is `0` Funded, `1` Released, or `2` Refunded. |
+| `order_count() -> u64` | – | Highest sequential order index assigned. Expired entries may leave gaps. |
+| `list_orders(start, limit) -> Vec<Escrow>` | – | Lists retained entries from the 1-based `start` index; `limit` must be 1–100. Expired entries are skipped. |
 
-- **Keys:** escrows are stored by `(seller, trade_id)` in persistent storage, and every write extends the TTL to ~30 days. Because only the seller can create under their own address, a third party cannot front-run a trade id.
+- **Keys:** escrows are stored by `(seller, trade_id)` in persistent storage, and every write extends the TTL to ~30 days. A sequential index supports bounded listing; because only the seller can create under their own address, a third party cannot front-run a trade id.
 - **Events:** `escrow_created`, `escrow_released`, `escrow_refunded`. The topics are `[name, seller, trade_id]`.
 - **Errors:** `AlreadyExists=1`, `NotFound=2`, `NotFunded=3` (already released or refunded), `InvalidAmount=4`, `SameParty=5`, `TooEarly=6`, `NotAParty=7`.
 - **No admin, no on-chain dispute resolution.** In Luminary a dispute is only a status. Note that once the timeout has passed, the seller can reclaim funds that were never released.

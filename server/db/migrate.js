@@ -1,45 +1,31 @@
-// Aplica server/db/schema.sql y luego server/db/migrations/*.sql (orden alfabético),
-// todo idempotente y en una única transacción. Uso: npm run db:migrate
-import { readFile, readdir } from 'node:fs/promises';
+// CLI de migraciones. Uso:
+//   npm run db:migrate              aplica las pendientes (server/db/migrations/NNN_*.sql)
+//   npm run db:migrate -- --status  lista aplicadas y pendientes
+// Ver server/db/migrator.js para el funcionamiento (schema_migrations, checksums, advisory lock).
 import { pool } from './pool.js';
-
-const schemaUrl = new URL('./schema.sql', import.meta.url);
-const migrationsUrl = new URL('./migrations/', import.meta.url);
+import { migrate, migrationStatus } from './migrator.js';
 
 async function main() {
-  const steps = [{ name: 'schema.sql', sql: await readFile(schemaUrl, 'utf8') }];
-  const files = (await readdir(migrationsUrl)).filter((f) => f.endsWith('.sql')).sort();
-  for (const name of files) steps.push({ name, sql: await readFile(new URL(name, migrationsUrl), 'utf8') });
-
-  const client = await pool.connect();
-  try {
-    // Sin parámetros, `pg` usa el protocolo simple y admite varias sentencias.
-    // El SQL proviene de archivos del repositorio, nunca de entrada de usuario.
-    await client.query('BEGIN');
-    for (const step of steps) {
-      await client.query(step.sql).catch((err) => {
-        err.message = `${step.name}: ${err.message}`;
-        throw err;
-      });
+  if (process.argv.includes('--status')) {
+    for (const m of await migrationStatus(pool)) {
+      console.log(
+        `${m.appliedAt ? '✔' : '·'} ${m.name}${m.appliedAt ? `  (${m.appliedAt.toISOString()})` : '  pendiente'}`
+      );
     }
-    await client.query('COMMIT');
-    console.log(`✔ Pasos: ${steps.map((s) => s.name).join(', ')}`);
-    const { rows } = await client.query(
-      `SELECT current_database() AS db, string_agg(table_name, ', ' ORDER BY table_name) AS tables
-         FROM information_schema.tables
-        WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'`
-    );
-    console.log(`✔ Migración aplicada en "${rows[0].db}". Tablas: ${rows[0].tables}`);
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw err;
-  } finally {
-    client.release();
-    await pool.end();
+    return;
   }
+  const { applied, skipped } = await migrate(pool, { log: (msg) => console.log(`✔ ${msg}`) });
+  const { rows } = await pool.query('SELECT current_database() AS db');
+  console.log(
+    applied.length
+      ? `✔ ${applied.length} migración(es) aplicada(s) en "${rows[0].db}"; ${skipped.length} ya estaban aplicadas.`
+      : `✔ "${rows[0].db}" ya está al día (${skipped.length} migraciones aplicadas).`
+  );
 }
 
-main().catch((err) => {
-  console.error('✖ Error en la migración:', err.message);
-  process.exit(1);
-});
+main()
+  .catch((err) => {
+    console.error('✖ Error en la migración:', err.message);
+    process.exitCode = 1;
+  })
+  .finally(() => pool.end());

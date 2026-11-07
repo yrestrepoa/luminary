@@ -1,6 +1,6 @@
 -- Luminary · esquema PostgreSQL (>= 13)
--- Idempotente: puede ejecutarse varias veces (npm run db:migrate).
--- migrate.js lo aplica dentro de una única transacción.
+-- Idempotente (se escribió antes del registro schema_migrations; bases existentes lo re-aplican sin cambios).
+-- migrate.js lo aplica en una transacción y lo registra en schema_migrations.
 
 -- Mantiene updated_at al día en cada UPDATE.
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$

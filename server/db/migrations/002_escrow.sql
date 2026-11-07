@@ -1,5 +1,5 @@
 -- 002 · Escrow on-chain (contrato Soroban luminary-escrow)
--- Idempotente; migrate.js lo aplica después de schema.sql, en la misma transacción.
+-- Idempotente; migrate.js lo aplica después de 001 en su propia transacción y lo registra en schema_migrations.
 --
 -- Flujo nuevo: pending → funded (vendedor depositó el USDC en el contrato)
 --              → paid (comprador pagó fiat) → released (contrato envió el USDC al comprador)

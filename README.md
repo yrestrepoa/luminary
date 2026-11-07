@@ -5,8 +5,8 @@ Luminary bridges local fiat economies with global decentralized finance, enablin
 
 - **Frontend:** React 18 + Vite + Tailwind CSS, React Router, Freighter wallet, `@stellar/stellar-sdk` (Stellar **Testnet**).
 - **Backend:** Node.js (ESM) + Express 5 in [`server/`](server), PostgreSQL via `pg` (node-postgres).
-- **Auth:** email + password (bcrypt), JWT stored in an `httpOnly`, `SameSite=Strict` cookie.
-- **Redis** (optional in development): shared login/register rate-limit counters across API processes.
+- **Auth:** email + password (bcrypt), JWT stored in an `httpOnly`, `SameSite=Strict` cookie. Each JWT carries a random `jti`, and logout revokes that token on the server.
+- **Redis** (optional in development): login/register rate-limit counters and the token revocation list, shared across API processes.
 
 ## Setup
 
@@ -45,9 +45,13 @@ docker run -d --name luminary-redis -p 127.0.0.1:6379:6379 \
 
 How the API uses Redis (`server/cache/`):
 
-- **`REDIS_URL` unset** → counters are kept in process memory. Fine for a single dev process. At startup the API logs `[cache] REDIS_URL no definido: … en MEMORIA del proceso`.
+- **`REDIS_URL` unset** → counters and revoked tokens are kept in process memory. Fine for a single dev process. At startup the API logs `[cache] REDIS_URL no definido: … en MEMORIA del proceso` plus a warning that logout only invalidates a token in that process and is forgotten on restart.
 - **`REDIS_URL` set** → counters live in Redis under the `luminary:` key prefix, shared by every API process.
-- **`REDIS_URL` set but Redis down (fail-safe)** → the API still starts and keeps reconnecting in the background. Until Redis comes back, routes that need it return **503** instead of running without limits: `/auth/login` and `/auth/register`. `/health` reports `cache: "unavailable"` with status 503. Public read routes keep working. The API recovers by itself once Redis is reachable again.
+- **`REDIS_URL` set but Redis down (fail-safe)** → the API still starts and keeps reconnecting in the background. Until Redis comes back, routes that need it return **503** instead of running without limits or skipping the revocation check: `/auth/login`, `/auth/register`, every authenticated route, and `/auth/logout` (which still clears the cookie, but the 503 tells the client the token was not revoked on the server). `/health` reports `cache: "unavailable"` with status 503. Public read routes keep working. The API recovers by itself once Redis is reachable again.
+
+#### Token revocation
+
+On logout, the API stores `revoked:jti:<jti>` in the cache, with a TTL equal to the token's remaining lifetime (≤ 7 days). After that the token has expired anyway. `requireAuth` rejects revoked tokens, and tokens without a `jti` (issued before this change), with 401. Replaying a cookie copied before logout therefore fails. Use `--appendonly yes` so revocations survive a Redis restart.
 
 ### 4. Configure the environment
 
@@ -97,7 +101,7 @@ All routes are under `/api`. Mutations must send `Content-Type: application/json
 | GET | `/health` | – | API, DB and cache status (`cache: redis \| memory \| unavailable`) |
 | POST | `/auth/register` | – | `{ email, password, displayName }` → sets session cookie |
 | POST | `/auth/login` | – | `{ email, password }` (rate-limited: 10 failures / 15 min / IP) |
-| POST | `/auth/logout` | – | Clears the session cookie |
+| POST | `/auth/logout` | – | Revokes the current JWT (`jti`) on the server and clears the cookie |
 | GET | `/auth/me` | ✔ | Current user |
 | PATCH | `/users/me` | ✔ | `{ displayName?, stellarAddress? }` (`null` unlinks the address) |
 | GET | `/offers` | – | Active offers. Query: `type=buy\|sell`, `currency`, `limit` |

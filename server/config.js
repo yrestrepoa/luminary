@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { Asset, Networks, StrKey } from '@stellar/stellar-sdk';
 
 /** Lee una variable de entorno obligatoria (falla al arrancar si falta). */
 function required(name) {
@@ -31,10 +32,28 @@ export const config = {
   },
   cookieName: 'luminary_token',
   stellar: {
-    horizonUrl: process.env.HORIZON_URL ?? 'https://horizon-testnet.stellar.org',
-    usdcCode: 'USDC',
-    usdcIssuer: process.env.USDC_ISSUER ?? 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
-    // Verifica en Horizon el pago USDC antes de marcar un trade como liberado.
+    networkPassphrase: process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET,
+    rpcUrl: process.env.SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org',
+    usdcIssuer: process.env.USDC_ISSUER || 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
+    // Contrato luminary-escrow desplegado (contract-luminary/contracts/escrow). Sin él no se puede fondear.
+    escrowContractId: optionalContractId('ESCROW_CONTRACT_ID'),
+    // Token del escrow: el SAC de USDC por defecto; ESCROW_TOKEN_ID permite otro SAC (pruebas).
+    get escrowTokenId() {
+      return (
+        optionalContractId('ESCROW_TOKEN_ID') ??
+        new Asset('USDC', this.usdcIssuer).contractId(this.networkPassphrase)
+      );
+    },
+    // Verifica on-chain (Soroban RPC) el escrow antes de cambiar el estado de un trade.
+    // false solo para pruebas locales sin red (npm run test:smoke usa hashes ficticios).
     verifyTx: (process.env.VERIFY_STELLAR_TX ?? 'true') !== 'false',
   },
 };
+
+/** Lee un id de contrato C… opcional; falla al arrancar si tiene formato inválido. */
+function optionalContractId(name) {
+  const value = process.env[name];
+  if (!value) return null;
+  if (!StrKey.isValidContract(value)) throw new Error(`${name} no es un id de contrato Stellar válido (C…)`);
+  return value;
+}

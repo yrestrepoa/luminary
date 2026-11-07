@@ -2,15 +2,17 @@ import { Router } from 'express';
 import { pool, one, withTransaction, isUniqueViolation } from '../db/pool.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../utils/validation.js';
-import { badRequest, conflict, forbidden, notFound, parseId } from '../utils/http.js';
+import { HttpError, badRequest, conflict, forbidden, notFound, parseId } from '../utils/http.js';
 import { toTrade } from '../utils/serializers.js';
-import { verifyUsdcPayment } from '../utils/stellar.js';
+import { verifyEscrowClosed, verifyEscrowFunded } from '../utils/escrow.js';
 import { config } from '../config.js';
 
 const router = Router();
 router.use(requireAuth);
 
-const TRADE_STATUSES = ['pending', 'paid', 'released', 'cancelled', 'disputed'];
+const TRADE_STATUSES = ['pending', 'funded', 'paid', 'released', 'refunded', 'cancelled', 'disputed'];
+// Estados con USDC bloqueado en el contrato: se pueden cerrar on-chain (release/refund).
+const ESCROWED = ['funded', 'paid', 'disputed'];
 
 const TRADE_SELECT = `
   SELECT t.*, round(t.usdc_amount * t.fiat_price, 2) AS fiat_amount,
@@ -114,71 +116,131 @@ router.post('/', async (req, res) => {
 /**
  * Transición de estado validada: estados `from` permitidos, rol requerido y columnas extra.
  * UPDATE condicional sobre el estado actual para evitar carreras.
+ * `set`: columnas extra a fijar (nombres fijos del código, valores parametrizados).
  */
-async function transition(req, res, { trade, from, to, role, txHash = null, onApplied }) {
+async function transition(req, res, { trade, from, to, role, set = {}, onApplied }) {
   const id = trade.id;
   if (role === 'buyer' && trade.buyer_id !== req.user.id) throw forbidden('Solo el comprador puede hacer esto');
   if (role === 'seller' && trade.seller_id !== req.user.id) throw forbidden('Solo el vendedor puede hacer esto');
   if (!from.includes(trade.status)) throw conflict(`No permitido en estado "${trade.status}"`);
 
-  await withTransaction(async (client) => {
-    const { rowCount } = await client.query(
-      `UPDATE trades SET status = $1, stellar_tx_hash = COALESCE($2, stellar_tx_hash)
-        WHERE id = $3 AND status = ANY($4::text[])`,
-      [to, txHash, id, from]
-    );
-    if (rowCount !== 1) throw conflict('La operación cambió de estado; recarga e intenta de nuevo');
-    await onApplied?.(client, trade);
-  });
+  const cols = Object.keys(set);
+  const assignments = cols.map((c, i) => `, ${c} = $${i + 4}`).join('');
+  try {
+    await withTransaction(async (client) => {
+      const { rowCount } = await client.query(
+        `UPDATE trades SET status = $1${assignments} WHERE id = $2 AND status = ANY($3::text[])`,
+        [to, id, from, ...cols.map((c) => set[c])]
+      );
+      if (rowCount !== 1) throw conflict('La operación cambió de estado; recarga e intenta de nuevo');
+      await onApplied?.(client, trade);
+    });
+  } catch (err) {
+    if (isUniqueViolation(err, 'trades_stellar_tx_hash_key') || isUniqueViolation(err, 'trades_escrow_tx_hash_key')) {
+      throw conflict('Ese hash ya fue registrado en otra operación');
+    }
+    throw err;
+  }
 
   res.json({ trade: toTrade(await findTrade(id)) });
 }
 
 const loadTrade = (req) => findOwnTrade(parseId(req.params.id), req.user.id);
+const restoreOffer = (client, t) =>
+  client.query('UPDATE offers SET usdc_amount = usdc_amount + $1 WHERE id = $2', [t.usdc_amount, t.offer_id]);
 
-/** El comprador declara que envió el pago fiat. */
-router.post('/:id/paid', async (req, res) =>
-  transition(req, res, { trade: await loadTrade(req), from: ['pending'], to: 'paid', role: 'buyer' })
-);
-
-/** El vendedor registra el hash del pago USDC al comprador (verificado en Horizon salvo VERIFY_STELLAR_TX=false). */
-router.post('/:id/release', async (req, res) => {
+/**
+ * POST /:id/fund — el vendedor informa el hash de la tx `create` del contrato de escrow
+ * (deposita los USDC del trade). Se verifica on-chain salvo VERIFY_STELLAR_TX=false.
+ */
+router.post('/:id/fund', async (req, res) => {
   const { txHash } = validate(req.body).txHash('txHash').done();
   const trade = await loadTrade(req);
   if (trade.seller_id !== req.user.id) throw forbidden('Solo el vendedor puede hacer esto');
-  if (trade.status !== 'paid') throw conflict(`No permitido en estado "${trade.status}"`);
+  if (trade.status !== 'pending') throw conflict(`No permitido en estado "${trade.status}"`);
+  if (!trade.seller_address) throw badRequest('Vincula tu dirección Stellar en tu perfil antes de depositar');
+  if (!trade.buyer_address) throw badRequest('El comprador no tiene dirección Stellar vinculada');
+
+  const contractId = config.stellar.escrowContractId;
+  let refundAfterLedger = null;
+  if (config.stellar.verifyTx) {
+    if (!contractId) throw new HttpError(503, 'El escrow on-chain no está configurado en el servidor (ESCROW_CONTRACT_ID)');
+    ({ refundAfterLedger } = await verifyEscrowFunded({
+      txHash,
+      contractId,
+      tokenId: config.stellar.escrowTokenId,
+      seller: trade.seller_address,
+      buyer: trade.buyer_address,
+      tradeId: trade.id,
+      amount: trade.usdc_amount,
+      notBefore: trade.created_at,
+    }));
+  }
+
+  await transition(req, res, {
+    trade,
+    from: ['pending'],
+    to: 'funded',
+    role: 'seller',
+    set: {
+      escrow_contract_id: contractId,
+      escrow_tx_hash: txHash,
+      escrow_seller: trade.seller_address,
+      escrow_buyer: trade.buyer_address,
+      escrow_refund_after_ledger: refundAfterLedger,
+    },
+  });
+});
+
+/** El comprador declara que envió el pago fiat (solo con el USDC ya bloqueado en escrow). */
+router.post('/:id/paid', async (req, res) =>
+  transition(req, res, { trade: await loadTrade(req), from: ['funded'], to: 'paid', role: 'buyer' })
+);
+
+/** Cierre on-chain verificado: `release` (USDC → comprador) o `refund` (USDC → vendedor). */
+async function closeEscrow(req, res, { fn, to, role, onApplied }) {
+  const { txHash } = validate(req.body).txHash('txHash').done();
+  const trade = await loadTrade(req);
+  if (role === 'seller' && trade.seller_id !== req.user.id) throw forbidden('Solo el vendedor puede hacer esto');
+  if (!ESCROWED.includes(trade.status)) throw conflict(`No permitido en estado "${trade.status}"`);
 
   if (config.stellar.verifyTx) {
-    if (!trade.seller_address) throw badRequest('Vincula tu dirección Stellar en tu perfil antes de liberar');
-    if (!trade.buyer_address) throw badRequest('El comprador no tiene dirección Stellar vinculada');
-    await verifyUsdcPayment({
+    if (!trade.escrow_contract_id) throw conflict('Esta operación no tiene escrow on-chain registrado');
+    await verifyEscrowClosed({
       txHash,
-      from: trade.seller_address,
-      to: trade.buyer_address,
-      amount: trade.usdc_amount,
+      fn,
+      contractId: trade.escrow_contract_id,
+      seller: trade.escrow_seller,
+      tradeId: trade.id,
       notBefore: trade.created_at,
     });
   }
+  await transition(req, res, { trade, from: ESCROWED, to, role, set: { stellar_tx_hash: txHash }, onApplied });
+}
 
-  try {
-    await transition(req, res, { trade, from: ['paid'], to: 'released', role: 'seller', txHash });
-  } catch (err) {
-    if (isUniqueViolation(err, 'trades_stellar_tx_hash_key')) throw conflict('Ese hash ya fue registrado en otra operación');
-    throw err;
-  }
-});
+/**
+ * El vendedor informa el hash de la tx `release` (el contrato envió el USDC al comprador).
+ * Se acepta desde funded/paid/disputed: el estado on-chain manda.
+ */
+router.post('/:id/release', (req, res) => closeEscrow(req, res, { fn: 'release', to: 'released', role: 'seller' }));
 
-/** Cancelar (cualquiera de las partes en 'pending'; solo el comprador en 'paid'). Devuelve el USDC a la oferta. */
+/**
+ * Cualquiera de las partes informa el hash de la tx `refund` (el contrato devolvió el USDC
+ * al vendedor: el comprador desistió, o el vendedor reclamó tras el plazo). El USDC vuelve a la oferta.
+ */
+router.post('/:id/refund', (req, res) => closeEscrow(req, res, { fn: 'refund', to: 'refunded', onApplied: restoreOffer }));
+
+/**
+ * Cancelar sin escrow: cualquiera de las partes en 'pending'. Los trades con USDC en el
+ * contrato se cierran con /refund (on-chain). `paid` sin escrow (trades previos al escrow) → solo el comprador.
+ */
 router.post('/:id/cancel', async (req, res) => {
   const trade = await loadTrade(req);
+  if (trade.escrow_tx_hash && ESCROWED.includes(trade.status)) {
+    throw conflict('Los USDC están en el escrow on-chain: usa el reembolso para cancelar');
+  }
   const from = trade.buyer_id === req.user.id ? ['pending', 'paid'] : ['pending'];
-  await transition(req, res, {
-    trade,
-    from,
-    to: 'cancelled',
-    onApplied: (client, t) =>
-      client.query('UPDATE offers SET usdc_amount = usdc_amount + $1 WHERE id = $2', [t.usdc_amount, t.offer_id]),
-  });
+  await transition(req, res, { trade, from, to: 'cancelled', onApplied: restoreOffer });
 });
 
 /** Abrir disputa tras el pago (resolución manual; fuera de alcance por ahora). */

@@ -5,6 +5,9 @@
  * de saldo se hacen en SQL).
  */
 
+import { config } from '../config.js';
+import { toStroops } from './stellar.js';
+
 const num = (v) => (v === null || v === undefined ? null : Number(v));
 
 export const toUser = (r) => ({
@@ -42,7 +45,19 @@ export const toTrade = (r) => ({
   price: num(r.fiat_price),
   currency: r.fiat_currency,
   fiatAmount: num(r.fiat_amount),
+  // Hash de la tx que cerró el escrow (release o refund).
   stellarTxHash: r.stellar_tx_hash ?? null,
+  // Datos para construir/consultar el escrow on-chain desde el frontend.
+  escrow: {
+    contractId: r.escrow_contract_id ?? config.stellar.escrowContractId,
+    tokenId: config.stellar.escrowTokenId,
+    tradeId: String(r.id), // u64 del contrato
+    amountStroops: toStroops(r.usdc_amount).toString(), // i128 exacto (7 decimales)
+    fundTxHash: r.escrow_tx_hash ?? null,
+    seller: r.escrow_seller ?? null,
+    buyer: r.escrow_buyer ?? null,
+    refundAfterLedger: r.escrow_refund_after_ledger ?? null,
+  },
   paymentMethod: r.payment_method,
   bank: r.bank,
   buyer: { id: r.buyer_id, displayName: r.buyer_name, stellarAddress: r.buyer_address ?? null },

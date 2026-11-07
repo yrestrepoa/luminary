@@ -1,18 +1,29 @@
-// Aplica server/db/schema.sql (idempotente) en una transacción. Uso: npm run db:migrate
-import { readFile } from 'node:fs/promises';
+// Aplica server/db/schema.sql y luego server/db/migrations/*.sql (orden alfabético),
+// todo idempotente y en una única transacción. Uso: npm run db:migrate
+import { readFile, readdir } from 'node:fs/promises';
 import { pool } from './pool.js';
 
 const schemaUrl = new URL('./schema.sql', import.meta.url);
+const migrationsUrl = new URL('./migrations/', import.meta.url);
 
 async function main() {
-  const sql = await readFile(schemaUrl, 'utf8');
+  const steps = [{ name: 'schema.sql', sql: await readFile(schemaUrl, 'utf8') }];
+  const files = (await readdir(migrationsUrl)).filter((f) => f.endsWith('.sql')).sort();
+  for (const name of files) steps.push({ name, sql: await readFile(new URL(name, migrationsUrl), 'utf8') });
+
   const client = await pool.connect();
   try {
     // Sin parámetros, `pg` usa el protocolo simple y admite varias sentencias.
-    // El SQL proviene de un archivo del repositorio, nunca de entrada de usuario.
+    // El SQL proviene de archivos del repositorio, nunca de entrada de usuario.
     await client.query('BEGIN');
-    await client.query(sql);
+    for (const step of steps) {
+      await client.query(step.sql).catch((err) => {
+        err.message = `${step.name}: ${err.message}`;
+        throw err;
+      });
+    }
     await client.query('COMMIT');
+    console.log(`✔ Pasos: ${steps.map((s) => s.name).join(', ')}`);
     const { rows } = await client.query(
       `SELECT current_database() AS db, string_agg(table_name, ', ' ORDER BY table_name) AS tables
          FROM information_schema.tables

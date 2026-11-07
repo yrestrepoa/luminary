@@ -8,6 +8,7 @@ Luminary bridges local fiat economies with global decentralized finance, enablin
 - **Backend:** Node.js (ESM) + Express 5 in [`server/`](server), PostgreSQL via `pg` (node-postgres).
 - **Auth:** email + password (bcrypt), JWT stored in an `httpOnly`, `SameSite=Strict` cookie. Each JWT carries a random `jti`, and logout revokes that token on the server.
 - **Redis** (optional in development): login/register rate-limit counters and the token revocation list, shared across API processes.
+- **Ops:** pino JSON logs with request ids, liveness/readiness probes, graceful shutdown, strict env validation, tracked migrations, Docker image + Compose stack, GitHub Actions CI. Deployment guide: [docs/PRODUCTION.md](docs/PRODUCTION.md).
 
 ## Setup
 
@@ -59,15 +60,17 @@ On logout, the API stores `revoked:jti:<jti>` in the cache, with a TTL equal to 
 ```bash
 cp .env.example .env
 # generate a JWT secret and paste it into .env as JWT_SECRET
-node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+openssl rand -hex 48
 ```
+
+The API validates its environment at boot and exits with a list of every problem (weak or placeholder `JWT_SECRET`, malformed values, and in production missing Redis/escrow/`PUBLIC_ORIGIN`). The most common variables are below; the full reference, including pool, proxy, CORS and logging settings, is in [docs/PRODUCTION.md](docs/PRODUCTION.md#environment-variables).
 
 | Variable | Description |
 | --- | --- |
 | `DATABASE_URL` | `postgres://user:pass@host:port/db`. If empty, the standard `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` are used. |
-| `JWT_SECRET` | **Required**, ≥ 32 characters. |
+| `JWT_SECRET` | **Required**, ≥ 32 characters, ≥ 128 bits of estimated entropy, not a placeholder. |
 | `PORT` / `HOST` | API listen address (default `127.0.0.1:4000`). The Vite dev proxy reads `PORT`. |
-| `NODE_ENV` | `production` enables `Secure` cookies (requires HTTPS). |
+| `NODE_ENV` | `production` enables `Secure` cookies (requires HTTPS) and the production checks. |
 | `REDIS_URL` | e.g. `redis://127.0.0.1:6379`. Empty → in-memory fallback (single process only). |
 | `ESCROW_CONTRACT_ID` | Deployed `luminary-escrow` contract (`C…`). Testnet deployment: `CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI`. Without it, funding returns 503 when verification is on. |
 | `VERIFY_STELLAR_TX` | `true` (default): every escrow step (fund / release / refund) is verified on-chain through Soroban RPC before the trade changes state. Set `false` **only** for local tests without network access (`npm run test:smoke`). |
@@ -82,7 +85,7 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
 ```bash
 npm install
-npm run db:migrate   # idempotent: creates/updates tables, safe to re-run
+npm run db:migrate   # applies pending migrations, tracked in schema_migrations; safe to re-run
 npm run dev          # API on :4000 + Vite on :5173 (/api is proxied to the API)
 ```
 
@@ -94,10 +97,36 @@ Open http://localhost:5173. If the API is not running, the market falls back to 
 | --- | --- |
 | `npm run dev` | API (`node --watch`) + Vite dev server, via `concurrently` |
 | `npm run server` | API only |
-| `npm run db:migrate` | Apply `server/db/schema.sql`, then `server/db/migrations/*.sql`, in one transaction (idempotent) |
+| `npm run db:migrate` | Apply pending `server/db/migrations/NNN_*.sql`, each in its own transaction, recorded with a checksum in `schema_migrations`. `-- --status` lists applied/pending. Never edit an applied migration; add a new one. |
+| `npm run lint` / `npm run format:check` | ESLint / Prettier (`lint:fix`, `format` to fix) |
+| `npm test` | Vitest: server unit tests, integration tests (only with `TEST_DATABASE_URL`), frontend tests. `npm run test:coverage` adds a coverage report in `coverage/` |
 | `npm run test:smoke` | End-to-end API checks against a running API (`API_URL`, default `http://127.0.0.1:4000`). Run the API with `VERIFY_STELLAR_TX=false`, since it uses fake tx hashes. Creates test users in the DB, so use a throwaway database. The last check uses up the login rate limit for 15 min. Before re-running, restart the API (memory mode) or clear the counters: `redis-cli --scan --pattern 'luminary:rl:*' \| xargs redis-cli del`. |
 | `npm run test:escrow-e2e` | Real **testnet** escrow flow without a browser: throwaway Friendbot accounts, a test token and its SAC, then create → release and create → refund with the frontend escrow client (keypair signer) and the server verifiers, plus negative cases. Needs `ESCROW_CONTRACT_ID` and internet access. |
 | `npm run build` | Production build of the frontend |
+
+### Tests
+
+```bash
+npm test                      # unit + frontend tests; integration tests are skipped
+# integration tests need throwaway Postgres and Redis (they TRUNCATE the tables):
+docker run -d --rm --name lum-pg -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=luminary_test -p 127.0.0.1:55432:5432 postgres:17-alpine
+docker run -d --rm --name lum-redis -p 127.0.0.1:56379:6379 redis:7-alpine
+TEST_DATABASE_URL=postgres://postgres:pw@127.0.0.1:55432/luminary_test \
+TEST_REDIS_URL=redis://127.0.0.1:56379/1 npm run test:coverage
+docker stop lum-pg lum-redis
+```
+
+Escrow verification is tested against a mocked Soroban RPC that returns real XDR built with the SDK; `npm run test:escrow-e2e` covers the real testnet path.
+
+### Docker
+
+```bash
+cp .env.example .env   # set JWT_SECRET, POSTGRES_PASSWORD, REDIS_PASSWORD, PUBLIC_ORIGIN
+docker compose up -d --build
+curl http://127.0.0.1:8080/api/health
+```
+
+One image serves the API and the built SPA. Compose adds PostgreSQL, Redis (AOF) and a one-shot `migrate` service. See [docs/PRODUCTION.md](docs/PRODUCTION.md).
 
 ## API
 
@@ -105,7 +134,9 @@ All routes are under `/api`. Mutations must send `Content-Type: application/json
 
 | Method | Route | Auth | Description |
 | --- | --- | --- | --- |
-| GET | `/health` | – | API, DB and cache status (`cache: redis \| memory \| unavailable`) |
+| GET | `/health/live` | – | Liveness: the process answers (no dependency checks) |
+| GET | `/health/ready` | – | Readiness: DB + cache reachable and not shutting down, else 503 (`cache: redis \| memory \| unavailable`) |
+| GET | `/health` | – | Alias of `/health/ready` |
 | POST | `/auth/register` | – | `{ email, password, displayName }` → sets session cookie |
 | POST | `/auth/login` | – | `{ email, password }` (rate-limited: 10 failures / 15 min / IP) |
 | POST | `/auth/logout` | – | Revokes the current JWT (`jti`) on the server and clears the cookie |

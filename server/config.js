@@ -235,6 +235,13 @@ export function loadConfig(env = process.env) {
       maxAgeMs: 7 * 24 * 60 * 60 * 1000,
     },
     cookieName: 'luminary_token',
+    trades: {
+      // Trades `pending` (tomados pero nunca fondeados) se cancelan solos tras este tiempo y
+      // devuelven el USDC reservado a la oferta (evita bloquear liquidez ajena). 0 = desactivado.
+      pendingTtlMs: int(env, 'PENDING_TRADE_TTL_MINUTES', 30, { min: 0, max: 7 * 24 * 60 }, problems) * 60_000,
+      // Cada cuánto corre el barrido de expiración en cada proceso de la API.
+      expiryIntervalMs: int(env, 'TRADE_EXPIRY_INTERVAL_SECONDS', 60, { min: 5, max: 3600 }, problems) * 1000,
+    },
     // Cookies Secure en producción (requiere HTTPS delante; localhost es contexto seguro).
     cookieSecure: isProd,
     stellar: {

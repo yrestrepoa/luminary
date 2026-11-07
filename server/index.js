@@ -21,6 +21,7 @@ try {
 const { createApp } = await import('./app.js');
 const { pool } = await import('./db/pool.js');
 const { cache } = await import('./cache/index.js');
+const { startTradeExpiryJob } = await import('./jobs/tradeExpiry.js');
 
 if (config.isProd && !config.trustProxyExplicit) {
   logger.warn(
@@ -38,6 +39,9 @@ const server = app.listen(config.port, config.host, () => {
   const { port } = server.address();
   logger.info({ host: config.host, port }, `Luminary API escuchando en http://${config.host}:${port}`);
 });
+// Cancela trades `pending` nunca fondeados pasado PENDING_TRADE_TTL_MINUTES (seguro con varias réplicas).
+const tradeExpiry = startTradeExpiryJob();
+
 // Timeouts HTTP: cortan clientes lentos (slowloris) y alinean keep-alive con el proxy
 // (el keep-alive del proxy hacia la API debe ser MENOR que keepAliveTimeout).
 server.requestTimeout = 30_000;
@@ -67,6 +71,7 @@ async function shutdown(signal) {
     server.closeIdleConnections();
   });
   clearTimeout(force);
+  await tradeExpiry.stop().catch((err) => logger.error({ err }, 'shutdown: trade expiry stop failed'));
   const results = await Promise.allSettled([pool.end(), cache.close()]);
   for (const r of results) if (r.status === 'rejected') logger.error({ err: r.reason }, 'shutdown: close failed');
   logger.info({ ms: Date.now() - started }, 'shutdown complete');

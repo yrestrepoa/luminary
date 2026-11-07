@@ -91,5 +91,14 @@ describe('serializers', () => {
       refundAfterLedger: 1234,
     });
     expect(t).toMatchObject({ usdcAmount: 10.5, fiatAmount: 43055.25, buyer: { id: 2 }, seller: { id: 1 } });
+    expect(t).toMatchObject({ expiresAt: null, cancelReason: null, fundedAt: null });
+  });
+
+  it('exposes the pending expiry and the cancel reason', () => {
+    const base = { id: 1, usdc_amount: '1', created_at: now, updated_at: now };
+    const pending = toTrade({ ...base, status: 'pending' });
+    expect(pending.expiresAt).toEqual(new Date(now.getTime() + config.trades.pendingTtlMs));
+    const expired = toTrade({ ...base, status: 'cancelled', cancel_reason: 'expired' });
+    expect(expired).toMatchObject({ expiresAt: null, cancelReason: 'expired' });
   });
 });

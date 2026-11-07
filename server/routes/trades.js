@@ -161,6 +161,9 @@ router.post('/:id/fund', async (req, res) => {
   const { txHash } = validate(req.body).txHash('txHash').done();
   const trade = await loadTrade(req);
   if (trade.seller_id !== req.user.id) throw forbidden('Solo el vendedor puede hacer esto');
+  if (trade.status === 'cancelled' && trade.cancel_reason === 'expired') {
+    throw conflict('La operación caducó sin depósito; si ya depositaste on-chain, reembolsa el escrow');
+  }
   if (trade.status !== 'pending') throw conflict(`No permitido en estado "${trade.status}"`);
   if (!trade.seller_address) throw badRequest('Vincula tu dirección Stellar en tu perfil antes de depositar');
   if (!trade.buyer_address) throw badRequest('El comprador no tiene dirección Stellar vinculada');

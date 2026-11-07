@@ -240,3 +240,19 @@ describe('parseTrustProxy', () => {
     }
   );
 });
+
+describe('trade timers', () => {
+  it('defaults to a 30 min pending TTL swept every minute', () => {
+    expect(loadConfig({}).trades).toMatchObject({ pendingTtlMs: 30 * 60_000, expiryIntervalMs: 60_000 });
+  });
+
+  it('accepts overrides and 0 to disable expiry', () => {
+    expect(loadConfig({ PENDING_TRADE_TTL_MINUTES: '0' }).trades.pendingTtlMs).toBe(0);
+    expect(loadConfig({ PENDING_TRADE_TTL_MINUTES: '5', TRADE_EXPIRY_INTERVAL_SECONDS: '10' }).trades).toMatchObject({
+      pendingTtlMs: 5 * 60_000,
+      expiryIntervalMs: 10_000,
+    });
+    expect(() => loadConfig({ PENDING_TRADE_TTL_MINUTES: '-1' })).toThrow(/PENDING_TRADE_TTL_MINUTES/);
+    expect(() => loadConfig({ TRADE_EXPIRY_INTERVAL_SECONDS: '1' })).toThrow(/TRADE_EXPIRY_INTERVAL_SECONDS/);
+  });
+});

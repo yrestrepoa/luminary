@@ -62,6 +62,17 @@ export const toTrade = (r) => ({
   bank: r.bank,
   buyer: { id: r.buyer_id, displayName: r.buyer_name, stellarAddress: r.buyer_address ?? null },
   seller: { id: r.seller_id, displayName: r.seller_name, stellarAddress: r.seller_address ?? null },
+  // 'expired' si el barrido automático canceló un trade `pending` nunca fondeado.
+  cancelReason: r.cancel_reason ?? null,
+  fundedAt: r.funded_at ?? null,
+  // Solo en `pending`: momento a partir del cual el trade se cancela solo si no se fondea.
+  expiresAt: pendingExpiry(r),
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
+
+function pendingExpiry(r) {
+  const ttl = config.trades.pendingTtlMs;
+  if (r.status !== 'pending' || !ttl || !r.created_at) return null;
+  return new Date(new Date(r.created_at).getTime() + ttl);
+}

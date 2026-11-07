@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { checkBalance } from '../services/stellar.js';
+import { checkBalance } from '../services/stellar/index.js';
 
-/** Carga (y permite refrescar) el balance de una cuenta Stellar. */
+/**
+ * Carga (y permite refrescar) el balance de una cuenta Stellar.
+ * balance: import('../types/index.js').AccountBalance | null
+ */
 export function useStellar(publicKey) {
   const [balance, setBalance] = useState(null);
   const [loading, setLoading] = useState(false);

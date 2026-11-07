@@ -1,7 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { connectFreighter, getConnectedAddress } from '../services/wallet.js';
+import { createContext, useCallback, useEffect, useState } from 'react';
+import { connectFreighter, getConnectedAddress } from '../services/wallet/index.js';
 
-const WalletContext = createContext(null);
+export const WalletContext = createContext(null);
 
 export function WalletProvider({ children }) {
   const [address, setAddress] = useState(null);
@@ -32,10 +32,4 @@ export function WalletProvider({ children }) {
       {children}
     </WalletContext.Provider>
   );
-}
-
-export function useWallet() {
-  const ctx = useContext(WalletContext);
-  if (!ctx) throw new Error('useWallet debe usarse dentro de <WalletProvider>');
-  return ctx;
 }

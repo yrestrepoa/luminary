@@ -12,6 +12,7 @@
     "server:dev": "node --watch server/index.js",
     "db:migrate": "node server/db/migrate.js",
     "test:smoke": "node server/scripts/smoke.js",
+    "test:escrow-e2e": "node server/scripts/escrow-e2e.js",
     "build": "vite build",
     "preview": "vite preview"
   },

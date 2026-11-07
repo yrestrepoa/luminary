@@ -1,6 +1,7 @@
 // Prueba de humo end-to-end contra una API en marcha (con BD migrada).
 // Uso: API_URL=http://127.0.0.1:4000 npm run test:smoke
-// Requiere VERIFY_STELLAR_TX=false en el servidor (usa hashes de transacción ficticios).
+// Requiere VERIFY_STELLAR_TX=false en el servidor (usa hashes de transacción ficticios;
+// la verificación on-chain del escrow se prueba con server/scripts/escrow-e2e.js).
 import { randomBytes } from 'node:crypto';
 import { Keypair } from '@stellar/stellar-sdk';
 
@@ -128,6 +129,23 @@ const t1 = r.body?.trade?.id;
 r = await bob('GET', `/offers/${offerId}`);
 check('available decremented in NUMERIC', r.body.offer.available === 89.5, r.body);
 
+r = await bob('GET', `/trades/${t1}`);
+check('trade exposes escrow params', r.body.trade.escrow?.amountStroops === '105000000' && r.body.trade.escrow.tradeId === String(t1) && /^C[A-Z2-7]{55}$/.test(r.body.trade.escrow.tokenId), r.body.trade.escrow);
+
+r = await bob('POST', `/trades/${t1}/paid`);
+check('paid before escrow funded 409', r.status === 409, r.body);
+r = await bob('POST', `/trades/${t1}/fund`, { txHash: fakeHash() });
+check('buyer cannot fund escrow 403', r.status === 403, r.body);
+r = await alice('POST', `/trades/${t1}/fund`, { txHash: 'nothex' });
+check('fund with invalid hash 400', r.status === 400 && r.body.details?.txHash, r.body);
+const fundHash = fakeHash();
+r = await alice('POST', `/trades/${t1}/fund`, { txHash: fundHash });
+check('seller funds escrow → funded', r.status === 200 && r.body.trade.status === 'funded' && r.body.trade.escrow.fundTxHash === fundHash && r.body.trade.escrow.seller === r.body.trade.seller.stellarAddress, r.body);
+r = await alice('POST', `/trades/${t1}/fund`, { txHash: fakeHash() });
+check('fund twice 409', r.status === 409, r.body);
+r = await alice('POST', `/trades/${t1}/cancel`);
+check('cancel with USDC in escrow 409', r.status === 409, r.body);
+
 r = await alice('POST', `/trades/${t1}/paid`);
 check('seller cannot mark paid 403', r.status === 403, r.body);
 r = await bob('POST', `/trades/${t1}/paid`);
@@ -136,9 +154,26 @@ r = await bob('POST', `/trades/${t1}/release`, { txHash: fakeHash() });
 check('buyer cannot release 403', r.status === 403, r.body);
 const hash = fakeHash();
 r = await alice('POST', `/trades/${t1}/release`, { txHash: hash });
-check('seller releases with tx hash', r.status === 200 && r.body.trade.status === 'released' && r.body.trade.stellarTxHash === hash, r.body);
+check('seller releases escrow', r.status === 200 && r.body.trade.status === 'released' && r.body.trade.stellarTxHash === hash, r.body);
 r = await alice('POST', `/trades/${t1}/cancel`);
 check('cancel released 409', r.status === 409, r.body);
+r = await bob('POST', `/trades/${t1}/refund`, { txHash: fakeHash() });
+check('refund released 409', r.status === 409, r.body);
+
+// Reembolso on-chain (el comprador desiste): el USDC vuelve a la oferta.
+r = await bob('POST', '/trades', { offerId, usdcAmount: 5 });
+const t3 = r.body?.trade?.id;
+r = await bob('POST', `/trades/${t3}/refund`, { txHash: fakeHash() });
+check('refund without escrow 409', r.status === 409, r.body);
+r = await alice('POST', `/trades/${t3}/fund`, { txHash: fundHash });
+check('reused fund tx hash 409', r.status === 409, r.body);
+await alice('POST', `/trades/${t3}/fund`, { txHash: fakeHash() });
+r = await bob('POST', `/trades/${t3}/refund`, { txHash: fakeHash() });
+check('buyer refund → refunded', r.status === 200 && r.body.trade.status === 'refunded', r.body);
+r = await bob('GET', `/offers/${offerId}`);
+check('available restored after refund', r.body.offer.available === 89.5, r.body);
+r = await bob('GET', '/trades?status=refunded');
+check('filter trades by refunded', r.status === 200 && r.body.trades.length === 1 && r.body.trades[0].id === t3, r.body);
 
 r = await bob('POST', '/trades', { offerId, usdcAmount: 20 });
 const t2 = r.body?.trade?.id;
@@ -148,7 +183,7 @@ r = await bob('GET', `/offers/${offerId}`);
 check('available restored after cancel', r.body.offer.available === 89.5, r.body);
 
 r = await bob('GET', '/trades');
-check('bob lists trades', r.status === 200 && r.body.trades.length === 2, r.body);
+check('bob lists trades', r.status === 200 && r.body.trades.length === 3, r.body);
 const carol = client();
 await carol('POST', '/auth/register', { email: `carol+${tag}@example.com`, password: 'supersecret3', displayName: 'Carol' });
 r = await carol('GET', `/trades/${t1}`);

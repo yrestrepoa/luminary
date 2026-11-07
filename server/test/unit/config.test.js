@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { Networks } from '@stellar/stellar-sdk';
 import {
@@ -158,6 +159,48 @@ describe('production requirements', () => {
 
   it('does not require server secrets for CLI tools', () => {
     expect(() => loadConfig({ DATABASE_URL: 'postgres://x@y/z' })).not.toThrow();
+  });
+});
+
+describe('placeholders shipped in the repository (audit L3)', () => {
+  /** Valor de `NAME=` en un archivo .env de ejemplo del repositorio. */
+  const exampleValue = (file, name) => {
+    const line = readFileSync(new URL(`../../../${file}`, import.meta.url), 'utf8')
+      .split('\n')
+      .find((l) => l.startsWith(`${name}=`));
+    return line?.slice(name.length + 1).trim();
+  };
+
+  it('refuses the exact JWT_SECRET from .env.example, in every environment', () => {
+    const placeholder = exampleValue('.env.example', 'JWT_SECRET');
+    expect(placeholder).toBeTruthy();
+    expect(jwtSecretProblems(placeholder).length).toBeGreaterThan(0);
+    expect(serverProblems({ JWT_SECRET: placeholder }).join('\n')).toMatch(/JWT_SECRET/);
+    expect(serverProblems(prodEnv({ JWT_SECRET: placeholder })).join('\n')).toMatch(/JWT_SECRET/);
+  });
+
+  it('refuses the .env.example database password in production', () => {
+    const url = exampleValue('.env.example', 'DATABASE_URL');
+    expect(serverProblems(prodEnv({ DATABASE_URL: url })).join('\n')).toMatch(/contraseña de ejemplo/);
+  });
+
+  it('refuses previously documented placeholder secrets', () => {
+    for (const v of [
+      'replace-with-a-long-random-string-of-at-least-32-chars',
+      'replace-with-the-output-of-openssl-rand-hex-48',
+      'CHANGE_ME',
+    ]) {
+      expect(jwtSecretProblems(v).length, v).toBeGreaterThan(0);
+    }
+  });
+
+  it('refuses production without REDIS_URL and with VERIFY_STELLAR_TX=false in any spelling', () => {
+    expect(serverProblems(prodEnv({ REDIS_URL: undefined })).join('\n')).toMatch(/REDIS_URL/);
+    for (const v of ['false', 'FALSE', ' False ']) {
+      expect(serverProblems(prodEnv({ VERIFY_STELLAR_TX: v })).join('\n'), v).toMatch(/VERIFY_STELLAR_TX/);
+    }
+    // Valores ambiguos no se interpretan: error de configuración.
+    expect(() => loadConfig(prodEnv({ VERIFY_STELLAR_TX: '0' }))).toThrow(/VERIFY_STELLAR_TX/);
   });
 });
 

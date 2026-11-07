@@ -159,7 +159,9 @@ export function loadConfig(env = process.env) {
 
   const databaseUrl = env.DATABASE_URL || undefined;
   const redisUrl = env.REDIS_URL || undefined;
-  const verifyTx = (env.VERIFY_STELLAR_TX ?? 'true') !== 'false';
+  const verifyRaw = (env.VERIFY_STELLAR_TX || 'true').trim().toLowerCase();
+  if (!['true', 'false'].includes(verifyRaw)) problems.push('VERIFY_STELLAR_TX debe ser true o false');
+  const verifyTx = verifyRaw !== 'false';
   const escrowContractId = contractId(env, 'ESCROW_CONTRACT_ID', problems);
   const escrowTokenOverride = contractId(env, 'ESCROW_TOKEN_ID', problems);
   const usdcIssuer = env.USDC_ISSUER || DEFAULT_USDC_ISSUER;

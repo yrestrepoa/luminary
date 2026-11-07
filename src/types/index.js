@@ -44,16 +44,31 @@
  */
 
 /**
- * Operación P2P. Flujo: pending → paid → released (o cancelled / disputed).
+ * Parámetros del escrow on-chain (contrato luminary-escrow) de una operación.
+ * @typedef {Object} TradeEscrow
+ * @property {string|null} contractId   Contrato de escrow (C…); null si el servidor no lo tiene configurado
+ * @property {string} tokenId           SAC del USDC (C…)
+ * @property {string} tradeId           u64 del contrato (= id de la operación)
+ * @property {string} amountStroops     i128 exacto (7 decimales)
+ * @property {string|null} fundTxHash   Hash de la tx `create`
+ * @property {string|null} seller       Dirección con la que se creó el escrow
+ * @property {string|null} buyer
+ * @property {number|null} refundAfterLedger Ledger desde el que el vendedor puede reclamar
+ */
+
+/**
+ * Operación P2P. Flujo: pending → funded (USDC en escrow) → paid → released
+ * (o cancelled / refunded / disputed).
  * @typedef {Object} Trade
  * @property {number} id
  * @property {number} offerId
- * @property {'pending'|'paid'|'released'|'cancelled'|'disputed'} status
+ * @property {'pending'|'funded'|'paid'|'released'|'refunded'|'cancelled'|'disputed'} status
  * @property {number} usdcAmount
  * @property {number} price
  * @property {string} currency
  * @property {number} fiatAmount
- * @property {string|null} stellarTxHash
+ * @property {string|null} stellarTxHash  Tx que cerró el escrow (release o refund)
+ * @property {TradeEscrow} escrow
  * @property {string} paymentMethod
  * @property {string} bank
  * @property {TradeParty} buyer

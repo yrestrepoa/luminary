@@ -23,7 +23,7 @@ export default function Dashboard() {
 
   const offers = data?.offers ?? [];
   const trades = data?.trades ?? [];
-  const open = trades.filter((t) => ['pending', 'paid', 'disputed'].includes(t.status));
+  const open = trades.filter((t) => ['pending', 'funded', 'paid', 'disputed'].includes(t.status));
   const completed = trades.filter((t) => t.status === 'released');
   const volume = completed.reduce((sum, t) => sum + t.usdcAmount, 0);
   const walletMismatch = address && user.stellarAddress && address !== user.stellarAddress;

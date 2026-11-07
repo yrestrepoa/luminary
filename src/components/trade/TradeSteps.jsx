@@ -1,12 +1,12 @@
 import { TRADE_STEPS } from '../../constants/trades.js';
 
-/** Indicador de progreso pending → paid → released. */
+/** Indicador de progreso pending → funded → paid → released. */
 export default function TradeSteps({ status }) {
   const current = TRADE_STEPS.findIndex((s) => s.key === status);
-  const halted = status === 'cancelled' || status === 'disputed';
+  const halted = ['cancelled', 'disputed', 'refunded'].includes(status);
 
   return (
-    <ol className="grid grid-cols-3 gap-2">
+    <ol className="grid grid-cols-4 gap-2">
       {TRADE_STEPS.map((step, i) => {
         const done = !halted && (i < current || status === 'released');
         const active = !halted && i === current && status !== 'released';

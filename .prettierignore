@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+package-lock.json
+contract-luminary/target/
+contract-luminary/**/test_snapshots/
+*.md

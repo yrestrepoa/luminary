@@ -34,6 +34,8 @@ export function useAsync(fn, deps = []) {
   useEffect(() => {
     reload();
     return () => {
+      // Contador (no un nodo DOM): invalidar el valor actual es justo lo que se busca.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       callId.current++;
     };
   }, [reload]);

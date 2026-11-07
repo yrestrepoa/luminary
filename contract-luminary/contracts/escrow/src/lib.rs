@@ -138,9 +138,11 @@ fn save(env: &Env, key: &DataKey, escrow: &Escrow) {
         env.storage()
             .persistent()
             .extend_ttl(&order_key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        env.storage()
-            .persistent()
-            .extend_ttl(&DataKey::Order(order_id), TTL_THRESHOLD, TTL_EXTEND_TO);
+        env.storage().persistent().extend_ttl(
+            &DataKey::Order(order_id),
+            TTL_THRESHOLD,
+            TTL_EXTEND_TO,
+        );
     }
     bump_instance(env);
 }
@@ -175,17 +177,13 @@ impl EscrowContract {
             .unwrap_or(0)
             .checked_add(1)
             .ok_or(Error::OrderIndexFull)?;
+        env.storage().instance().set(&DataKey::NextOrder, &order_id);
         env.storage()
-            .instance()
-            .set(&DataKey::NextOrder, &order_id);
-        env.storage().persistent().set(
-            &DataKey::Order(order_id),
-            &(seller.clone(), trade_id),
-        );
-        env.storage().persistent().set(
-            &DataKey::EscrowOrder(seller.clone(), trade_id),
-            &order_id,
-        );
+            .persistent()
+            .set(&DataKey::Order(order_id), &(seller.clone(), trade_id));
+        env.storage()
+            .persistent()
+            .set(&DataKey::EscrowOrder(seller.clone(), trade_id), &order_id);
 
         let escrow = Escrow {
             trade_id,

@@ -129,6 +129,39 @@ fn create_locks_funds_and_records_escrow() {
 }
 
 #[test]
+fn orders_can_be_listed_with_pagination() {
+    let s = setup();
+    let first = s.create();
+    let second_trade_id = TRADE + 1;
+    s.client.create(
+        &s.seller,
+        &s.buyer,
+        &s.token.address,
+        &AMOUNT,
+        &second_trade_id,
+    );
+
+    assert_eq!(s.client.order_count(), 2);
+    let first_page = s.client.list_orders(&1, &1);
+    assert_eq!(first_page.len(), 1);
+    assert_eq!(first_page.get(0).unwrap(), first);
+
+    let second_page = s.client.list_orders(&2, &1);
+    assert_eq!(second_page.len(), 1);
+    assert_eq!(second_page.get(0).unwrap().trade_id, second_trade_id);
+}
+
+#[test]
+fn order_listing_rejects_invalid_page_sizes() {
+    let s = setup();
+    assert_eq!(s.client.try_list_orders(&1, &0), Err(Ok(Error::InvalidLimit)));
+    assert_eq!(
+        s.client.try_list_orders(&1, &(MAX_ORDER_PAGE_SIZE + 1)),
+        Err(Ok(Error::InvalidLimit))
+    );
+}
+
+#[test]
 fn happy_path_release_pays_buyer() {
     let s = setup();
     s.create();

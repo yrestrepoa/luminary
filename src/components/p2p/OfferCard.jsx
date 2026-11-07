@@ -1,9 +1,7 @@
-const fmtFiat = (value, currency) =>
-  new Intl.NumberFormat('es-CO', { style: 'currency', currency, maximumFractionDigits: 2 }).format(value);
+import { fmtFiat } from '../../utils/format.js';
 
 /**
- * offer: { id, type: 'sell'|'buy', merchant, rating, trades, price, currency,
- *          available, min, max, paymentMethod, bank }
+ * offer: import('../../types/index.js').Offer
  * type 'sell' = el comerciante vende USDC (el usuario compra).
  */
 export default function OfferCard({ offer, onAction, disabled }) {

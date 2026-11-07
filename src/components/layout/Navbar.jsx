@@ -1,6 +1,5 @@
-import { useWallet } from '../../context/WalletContext.jsx';
-
-const short = (a) => `${a.slice(0, 4)}…${a.slice(-4)}`;
+import { useWallet } from '../../hooks/useWallet.js';
+import { shortenAddress } from '../../utils/format.js';
 
 export default function Navbar() {
   const { address, connecting, connect, disconnect } = useWallet();
@@ -29,7 +28,7 @@ export default function Navbar() {
               title="Desconectar"
               className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 font-mono text-sm hover:bg-white/10"
             >
-              {short(address)}
+              {shortenAddress(address)}
             </button>
           ) : (
             <button

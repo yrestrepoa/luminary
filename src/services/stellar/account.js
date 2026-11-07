@@ -27,6 +27,7 @@ export async function checkBalance(publicKey) {
 
 /** Fondea una cuenta de Testnet con XLM vía Friendbot. */
 export async function fundWithFriendbot(publicKey) {
+  if (!FRIENDBOT_URL) throw new Error('Friendbot solo está disponible en testnet');
   const res = await fetch(`${FRIENDBOT_URL}?addr=${encodeURIComponent(publicKey)}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

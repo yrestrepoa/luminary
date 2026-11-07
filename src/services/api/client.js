@@ -18,14 +18,17 @@ export const setUnauthorizedHandler = (fn) => {
   onUnauthorized = fn;
 };
 
-const BASE = '/api';
+// Mismo origen por defecto (/api detrás del mismo dominio que la SPA). Si se apunta a otro
+// origen con VITE_API_BASE_URL, debe ser del mismo "site" (cookie SameSite=Strict) y estar en
+// CORS_ORIGINS del servidor.
+export const API_BASE = (import.meta.env?.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
 async function request(method, path, body) {
   let res;
   try {
-    res = await fetch(BASE + path, {
+    res = await fetch(API_BASE + path, {
       method,
-      credentials: 'same-origin',
+      credentials: API_BASE.startsWith('/') ? 'same-origin' : 'include',
       headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });

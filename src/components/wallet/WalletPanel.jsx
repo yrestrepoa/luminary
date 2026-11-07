@@ -6,7 +6,7 @@ import { useWallet } from '../../hooks/useWallet.js';
 import { useStellar } from '../../hooks/useStellar.js';
 import { createTrustline, sendUSDC, fundWithFriendbot } from '../../services/stellar/index.js';
 import { freighterSigner } from '../../services/wallet/index.js';
-import { EXPLORER_TX_URL, EXPLORER_ACCOUNT_URL } from '../../config/stellar.js';
+import { EXPLORER_TX_URL, EXPLORER_ACCOUNT_URL, IS_TESTNET } from '../../config/stellar.js';
 import { fmtNumber, shortenAddress } from '../../utils/format.js';
 
 /**
@@ -101,7 +101,7 @@ export default function WalletPanel() {
             </button>
           </div>
 
-          {balance && !balance.funded && (
+          {IS_TESTNET && balance && !balance.funded && (
             <button
               onClick={onFund}
               disabled={!!busy}
@@ -125,6 +125,9 @@ export default function WalletPanel() {
                 value={dest}
                 onChange={(e) => setDest(e.target.value)}
                 placeholder="Destino G…"
+                aria-label="Dirección Stellar de destino"
+                autoComplete="off"
+                spellCheck={false}
                 required
                 className={`${INPUT_CLASS} font-mono text-xs`}
               />
@@ -136,6 +139,7 @@ export default function WalletPanel() {
                   min="0.0000001"
                   step="any"
                   placeholder="Monto USDC"
+                  aria-label="Monto en USDC"
                   required
                   className={`${INPUT_CLASS} min-w-0`}
                 />

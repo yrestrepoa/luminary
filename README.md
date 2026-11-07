@@ -3,7 +3,8 @@ Luminary bridges local fiat economies with global decentralized finance, enablin
 
 ## Stack
 
-- **Frontend:** React 18 + Vite + Tailwind CSS, React Router, Freighter wallet, `@stellar/stellar-sdk` (Stellar **Testnet**).
+- **Frontend:** React 18 + Vite + Tailwind CSS, React Router, Freighter wallet, `@stellar/stellar-sdk` v17 (Stellar **Testnet**).
+- **Escrow:** Soroban smart contract [`luminary-escrow`](contract-luminary/contracts/escrow) holds the seller's USDC until it is released to the buyer or refunded. See [contract-luminary/README.md](contract-luminary/README.md).
 - **Backend:** Node.js (ESM) + Express 5 in [`server/`](server), PostgreSQL via `pg` (node-postgres).
 - **Auth:** email + password (bcrypt), JWT stored in an `httpOnly`, `SameSite=Strict` cookie. Each JWT carries a random `jti`, and logout revokes that token on the server.
 - **Redis** (optional in development): login/register rate-limit counters and the token revocation list, shared across API processes.
@@ -12,7 +13,7 @@ Luminary bridges local fiat economies with global decentralized finance, enablin
 
 ### 1. Requirements
 
-- Node.js ≥ 20
+- Node.js ≥ 22.12 (required by `@stellar/stellar-sdk` v17)
 - PostgreSQL ≥ 13
 - Redis ≥ 6 (recommended; required when running more than one API process)
 - [Freighter](https://freighter.app) browser extension set to **Testnet** (to sign Stellar transactions)
@@ -68,7 +69,12 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 | `PORT` / `HOST` | API listen address (default `127.0.0.1:4000`). The Vite dev proxy reads `PORT`. |
 | `NODE_ENV` | `production` enables `Secure` cookies (requires HTTPS). |
 | `REDIS_URL` | e.g. `redis://127.0.0.1:6379`. Empty → in-memory fallback (single process only). |
-| `VERIFY_STELLAR_TX` | `true` (default): when a seller releases a trade, the API checks on Horizon that the tx really pays the USDC to the buyer. |
+| `ESCROW_CONTRACT_ID` | Deployed `luminary-escrow` contract (`C…`). Testnet deployment: `CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI`. Without it, funding returns 503 when verification is on. |
+| `VERIFY_STELLAR_TX` | `true` (default): every escrow step (fund / release / refund) is verified on-chain through Soroban RPC before the trade changes state. Set `false` **only** for local tests without network access (`npm run test:smoke`). |
+| `SOROBAN_RPC_URL` | Default `https://soroban-testnet.stellar.org`. |
+| `STELLAR_NETWORK_PASSPHRASE` | Default: Testnet. |
+| `USDC_ISSUER` / `ESCROW_TOKEN_ID` | Escrow token. Defaults to the Stellar Asset Contract of testnet USDC (`CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`). `ESCROW_TOKEN_ID` overrides it with any SAC id. |
+| `VITE_SOROBAN_RPC_URL` | Frontend Soroban RPC (default testnet). The frontend gets the contract and token ids from the API (`trade.escrow`), so the server config is the single source of truth. |
 
 `.env` is git-ignored; never commit it.
 
@@ -88,8 +94,9 @@ Open http://localhost:5173. If the API is not running, the market falls back to 
 | --- | --- |
 | `npm run dev` | API (`node --watch`) + Vite dev server, via `concurrently` |
 | `npm run server` | API only |
-| `npm run db:migrate` | Apply `server/db/schema.sql` in a transaction |
+| `npm run db:migrate` | Apply `server/db/schema.sql`, then `server/db/migrations/*.sql`, in one transaction (idempotent) |
 | `npm run test:smoke` | End-to-end API checks against a running API (`API_URL`, default `http://127.0.0.1:4000`). Run the API with `VERIFY_STELLAR_TX=false`, since it uses fake tx hashes. Creates test users in the DB, so use a throwaway database. The last check uses up the login rate limit for 15 min. Before re-running, restart the API (memory mode) or clear the counters: `redis-cli --scan --pattern 'luminary:rl:*' \| xargs redis-cli del`. |
+| `npm run test:escrow-e2e` | Real **testnet** escrow flow without a browser: throwaway Friendbot accounts, a test token and its SAC, then create → release and create → refund with the frontend escrow client (keypair signer) and the server verifiers, plus negative cases. Needs `ESCROW_CONTRACT_ID` and internet access. |
 | `npm run build` | Production build of the frontend |
 
 ## API
@@ -113,9 +120,35 @@ All routes are under `/api`. Mutations must send `Content-Type: application/json
 | GET | `/trades` | ✔ | My trades. Query: `status` |
 | GET | `/trades/:id` | ✔ party | Trade detail |
 | POST | `/trades` | ✔ | Take an offer: `{ offerId, usdcAmount }` (reserves the USDC on the offer) |
-| POST | `/trades/:id/paid` | ✔ buyer | Buyer marks the fiat payment as sent |
-| POST | `/trades/:id/release` | ✔ seller | `{ txHash }` of the USDC payment to the buyer (verified on Horizon) |
-| POST | `/trades/:id/cancel` | ✔ party | Cancel (either party while `pending`; buyer also while `paid`) and return USDC to the offer |
+| POST | `/trades/:id/fund` | ✔ seller | `{ txHash }` of the escrow `create` call. Checks that the tx invoked our contract for `(seller, trade id)` and that the on-chain escrow is `Funded` with the right buyer, token and amount. `pending → funded` |
+| POST | `/trades/:id/paid` | ✔ buyer | Buyer marks the fiat payment as sent (`funded → paid`) |
+| POST | `/trades/:id/release` | ✔ seller | `{ txHash }` of the escrow `release` call. On-chain state must be `Released`. `funded/paid/disputed → released` |
+| POST | `/trades/:id/refund` | ✔ party | `{ txHash }` of the escrow `refund` call (buyer backs out, or seller reclaims after the timeout). On-chain state must be `Refunded`. The USDC goes back to the offer. `funded/paid/disputed → refunded` |
+| POST | `/trades/:id/cancel` | ✔ party | Cancel while `pending`, before any escrow. Returns the USDC to the offer. Once funds are in escrow, use `/refund`. |
 | POST | `/trades/:id/dispute` | ✔ party | Open a dispute after payment (resolved manually for now) |
 
-Offer `type: "sell"` means the creator sells USDC. Trade flow: `pending → paid → released`, with `cancelled` / `disputed` as side exits.
+Offer `type: "sell"` means the creator sells USDC.
+
+## Trade flow (on-chain escrow)
+
+```
+pending ──fund (seller signs create)──▶ funded ──buyer pays fiat──▶ paid ──release (seller)──▶ released
+   │                                      │                          │
+   └──cancel──▶ cancelled                 └──── refund (buyer any time / seller after ~24 h) ──▶ refunded
+                                                                     └──dispute──▶ disputed (status only; release/refund still possible)
+```
+
+1. **Taking an offer** opens a `pending` trade and reserves the amount on the offer.
+2. **Fund:** the seller deposits the USDC in the escrow contract (Freighter signs `create`). The API verifies it and moves the trade to `funded`. Before funding, the UI checks that the buyer has a USDC trustline. Without one, the release would fail.
+3. **Pay:** the buyer sends the fiat off-chain and marks the trade `paid`. This is only allowed once the funds are locked.
+4. **Release:** the seller signs `release`, and the contract pays the buyer. The API verifies it, and the trade becomes `released`.
+5. **Refund:** the buyer can back out at any time (the USDC goes back to the seller). The seller can reclaim on their own once the ~24 h ledger timeout has passed. The trade becomes `refunded` and the offer gets the amount back.
+
+The browser stores each escrow tx hash in `localStorage` as soon as the network accepts it. If registering it with the API fails, the UI offers **retry** instead of sending a second transaction. A tx sent from another tool can also be registered by hash.
+
+**Safety notes**
+
+- The contract has no admin. A dispute is only a Luminary status and cannot move funds. Once the timeout has passed, the seller can reclaim funds that were never released, **even if the buyer already paid**. Buyers should only pay after `funded`, and sellers should release promptly.
+- If the seller funds on-chain but never registers the tx, and the trade is then cancelled, the USDC stays in the contract. The seller reclaims it after the timeout, or the buyer can refund it.
+- Trades opened before the escrow migration have no escrow. They can only be cancelled.
+

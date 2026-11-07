@@ -14,7 +14,7 @@ Luminary bridges local fiat economies with global decentralized finance, enablin
 
 ### 1. Requirements
 
-- Node.js ≥ 22.12 (required by `@stellar/stellar-sdk` v17)
+- Node.js ≥ 22.12 to run the API (required by `@stellar/stellar-sdk` v17). The dev/test toolchain needs ≥ 22.22.2 (jsdom 31); `.nvmrc` tracks the latest Node 22, which CI uses.
 - PostgreSQL ≥ 13
 - Redis ≥ 6 (recommended; required when running more than one API process)
 - [Freighter](https://freighter.app) browser extension set to **Testnet** (to sign Stellar transactions)

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { connectFreighter, getConnectedAddress } from '../services/wallet.js';
+import { connectFreighter, getConnectedAddress } from '../services/wallet/index.js';
 
 const WalletContext = createContext(null);
 

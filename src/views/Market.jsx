@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import OfferCard from '../components/p2p/OfferCard.jsx';
 import { useWallet } from '../context/WalletContext.jsx';
 import { useStellar } from '../hooks/useStellar.js';
-import { createTrustline, sendUSDC, fundWithFriendbot } from '../services/stellar.js';
-import { freighterSigner } from '../services/wallet.js';
+import { createTrustline, sendUSDC, fundWithFriendbot } from '../services/stellar/index.js';
+import { freighterSigner } from '../services/wallet/index.js';
 import { EXPLORER_TX_URL, EXPLORER_ACCOUNT_URL } from '../config/stellar.js';
 
 const MOCK_OFFERS = [

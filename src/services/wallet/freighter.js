@@ -6,7 +6,7 @@ import {
   getNetwork,
   signTransaction,
 } from '@stellar/freighter-api';
-import { NETWORK_PASSPHRASE } from '../config/stellar.js';
+import { NETWORK_PASSPHRASE } from '../../config/stellar.js';
 
 /**
  * Conecta la extensión Freighter y devuelve la clave pública del usuario.
@@ -42,7 +42,7 @@ export async function getConnectedAddress() {
 }
 
 /**
- * Firmante basado en Freighter, compatible con services/stellar.js.
+ * Firmante basado en Freighter, compatible con services/stellar.
  * Interfaz: { publicKey, sign(xdr) => Promise<signedXdr> }
  */
 export function freighterSigner(publicKey) {

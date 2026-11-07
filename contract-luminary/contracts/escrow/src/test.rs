@@ -154,7 +154,10 @@ fn orders_can_be_listed_with_pagination() {
 #[test]
 fn order_listing_rejects_invalid_page_sizes() {
     let s = setup();
-    assert_eq!(s.client.try_list_orders(&1, &0), Err(Ok(Error::InvalidLimit)));
+    assert_eq!(
+        s.client.try_list_orders(&1, &0),
+        Err(Ok(Error::InvalidLimit))
+    );
     assert_eq!(
         s.client.try_list_orders(&1, &(MAX_ORDER_PAGE_SIZE + 1)),
         Err(Ok(Error::InvalidLimit))

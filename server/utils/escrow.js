@@ -4,7 +4,15 @@
 // (1) que el hash informado es una transacción exitosa que invoca la función esperada
 //     de NUESTRO contrato para este (seller, trade_id), y
 // (2) que el estado actual del escrow (get_escrow) coincide con lo esperado.
-import { Account, Address, Contract, TransactionBuilder, nativeToScVal, rpc, scValToNative } from '@stellar/stellar-sdk';
+import {
+  Account,
+  Address,
+  Contract,
+  TransactionBuilder,
+  nativeToScVal,
+  rpc,
+  scValToNative,
+} from '@stellar/stellar-sdk';
 import { config } from '../config.js';
 import { HttpError, badRequest } from './http.js';
 import { toStroops } from './stellar.js';
@@ -36,7 +44,11 @@ export async function readEscrow({ contractId, seller, tradeId }) {
     networkPassphrase: config.stellar.networkPassphrase,
   })
     .addOperation(
-      new Contract(contractId).call('get_escrow', new Address(seller).toScVal(), nativeToScVal(BigInt(tradeId), { type: 'u64' }))
+      new Contract(contractId).call(
+        'get_escrow',
+        new Address(seller).toScVal(),
+        nativeToScVal(BigInt(tradeId), { type: 'u64' })
+      )
     )
     .setTimeout(30)
     .build();
@@ -81,14 +93,19 @@ export async function verifyInvocation({ txHash, contractId, fn, seller, tradeId
     throw unavailable(err);
   }
   if (res.status === rpc.Api.GetTransactionStatus.NOT_FOUND) {
-    throw badRequest('Transacción no encontrada en Soroban RPC (si acabas de enviarla, espera unos segundos y reintenta)');
+    throw badRequest(
+      'Transacción no encontrada en Soroban RPC (si acabas de enviarla, espera unos segundos y reintenta)'
+    );
   }
   if (res.status !== rpc.Api.GetTransactionStatus.SUCCESS) throw badRequest('La transacción falló on-chain');
 
   let tx = TransactionBuilder.fromXDR(res.envelopeXdr, config.stellar.networkPassphrase);
   if (tx.innerTransaction) tx = tx.innerTransaction; // fee bump
   const op = tx.operations[0];
-  const call = op?.type === 'invokeHostFunction' && op.func.type === 'hostFunctionTypeInvokeContract' ? op.func.invokeContract : null;
+  const call =
+    op?.type === 'invokeHostFunction' && op.func.type === 'hostFunctionTypeInvokeContract'
+      ? op.func.invokeContract
+      : null;
   if (!call) throw badRequest('La transacción no invoca un contrato');
 
   const invoked = Address.fromScAddress(call.contractAddress).toString();
@@ -133,6 +150,8 @@ export async function verifyEscrowClosed({ txHash, contractId, fn, seller, trade
   const escrow = await readEscrow({ contractId, seller, tradeId });
   const expected = fn === 'release' ? 'released' : 'refunded';
   if (escrow?.status !== expected) {
-    throw badRequest(`El escrow on-chain no está ${expected === 'released' ? 'liberado' : 'reembolsado'} (estado: ${escrow?.status ?? 'inexistente'})`);
+    throw badRequest(
+      `El escrow on-chain no está ${expected === 'released' ? 'liberado' : 'reembolsado'} (estado: ${escrow?.status ?? 'inexistente'})`
+    );
   }
 }

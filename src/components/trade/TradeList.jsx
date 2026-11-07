@@ -16,7 +16,10 @@ export default function TradeList({ trades, userId }) {
         const counterpart = iBuy ? t.seller : t.buyer;
         return (
           <li key={t.id}>
-            <Link to={ROUTES.trade(t.id)} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition hover:bg-white/5">
+            <Link
+              to={ROUTES.trade(t.id)}
+              className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition hover:bg-white/5"
+            >
               <div className="flex items-center gap-3">
                 <span
                   className={`grid h-9 w-9 place-items-center rounded-full text-xs font-semibold ${iBuy ? 'bg-emerald-400/10 text-emerald-300' : 'bg-rose-400/10 text-rose-300'}`}

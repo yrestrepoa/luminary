@@ -85,10 +85,14 @@ router.post('/', async (req, res) => {
 
     const fiat = usdcAmount * Number(offer.fiat_price);
     if (offer.min_fiat !== null && fiat < Number(offer.min_fiat)) {
-      throw badRequest('Datos inválidos', { usdcAmount: `El monto fiat mínimo es ${offer.min_fiat} ${offer.fiat_currency}` });
+      throw badRequest('Datos inválidos', {
+        usdcAmount: `El monto fiat mínimo es ${offer.min_fiat} ${offer.fiat_currency}`,
+      });
     }
     if (offer.max_fiat !== null && fiat > Number(offer.max_fiat)) {
-      throw badRequest('Datos inválidos', { usdcAmount: `El monto fiat máximo es ${offer.max_fiat} ${offer.fiat_currency}` });
+      throw badRequest('Datos inválidos', {
+        usdcAmount: `El monto fiat máximo es ${offer.max_fiat} ${offer.fiat_currency}`,
+      });
     }
 
     // Comparación y resta en NUMERIC (sin errores de coma flotante).
@@ -164,7 +168,8 @@ router.post('/:id/fund', async (req, res) => {
   const contractId = config.stellar.escrowContractId;
   let refundAfterLedger = null;
   if (config.stellar.verifyTx) {
-    if (!contractId) throw new HttpError(503, 'El escrow on-chain no está configurado en el servidor (ESCROW_CONTRACT_ID)');
+    if (!contractId)
+      throw new HttpError(503, 'El escrow on-chain no está configurado en el servidor (ESCROW_CONTRACT_ID)');
     ({ refundAfterLedger } = await verifyEscrowFunded({
       txHash,
       contractId,
@@ -228,7 +233,9 @@ router.post('/:id/release', (req, res) => closeEscrow(req, res, { fn: 'release',
  * Cualquiera de las partes informa el hash de la tx `refund` (el contrato devolvió el USDC
  * al vendedor: el comprador desistió, o el vendedor reclamó tras el plazo). El USDC vuelve a la oferta.
  */
-router.post('/:id/refund', (req, res) => closeEscrow(req, res, { fn: 'refund', to: 'refunded', onApplied: restoreOffer }));
+router.post('/:id/refund', (req, res) =>
+  closeEscrow(req, res, { fn: 'refund', to: 'refunded', onApplied: restoreOffer })
+);
 
 /**
  * Cancelar sin escrow: cualquiera de las partes en 'pending'. Los trades con USDC en el

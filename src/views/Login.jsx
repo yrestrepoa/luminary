@@ -38,12 +38,34 @@ export default function Login() {
     <AuthCard
       title="Inicia sesión"
       subtitle="Accede para publicar ofertas y operar USDC."
-      footer={<>¿No tienes cuenta? <AuthLink to={ROUTES.register}>Regístrate</AuthLink></>}
+      footer={
+        <>
+          ¿No tienes cuenta? <AuthLink to={ROUTES.register}>Regístrate</AuthLink>
+        </>
+      }
     >
       <ErrorBanner>{error}</ErrorBanner>
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-        <FormField label="Email" name="email" type="email" autoComplete="email" required value={form.email} onChange={onChange} error={details.email} />
-        <FormField label="Contraseña" name="password" type="password" autoComplete="current-password" required value={form.password} onChange={onChange} error={details.password} />
+        <FormField
+          label="Email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+          value={form.email}
+          onChange={onChange}
+          error={details.email}
+        />
+        <FormField
+          label="Contraseña"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+          value={form.password}
+          onChange={onChange}
+          error={details.password}
+        />
         <Button type="submit" loading={loading} loadingText="Entrando…" className="mt-2 py-2.5">
           Entrar
         </Button>

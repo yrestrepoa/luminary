@@ -8,7 +8,15 @@ const VARIANTS = {
 };
 
 /** Botón con las variantes visuales de la app. `loading` lo deshabilita y muestra `loadingText`. */
-export default function Button({ variant = 'primary', loading, loadingText, className = '', children, disabled, ...props }) {
+export default function Button({
+  variant = 'primary',
+  loading,
+  loadingText,
+  className = '',
+  children,
+  disabled,
+  ...props
+}) {
   return (
     <button
       disabled={disabled || loading}

@@ -14,10 +14,14 @@ export default function NoticeBanner({ notice, onClose }) {
       <span>
         {notice.text}{' '}
         {notice.href && (
-          <a href={notice.href} target="_blank" rel="noreferrer" className="underline">Ver transacción</a>
+          <a href={notice.href} target="_blank" rel="noreferrer" className="underline">
+            Ver transacción
+          </a>
         )}
       </span>
-      <button onClick={onClose} className="opacity-60 hover:opacity-100" aria-label="Cerrar">✕</button>
+      <button onClick={onClose} className="opacity-60 hover:opacity-100" aria-label="Cerrar">
+        ✕
+      </button>
     </div>
   );
 }

@@ -16,9 +16,7 @@ const server = app.listen(config.port, config.host, () => {
 });
 
 function shutdown() {
-  server.close(() =>
-    Promise.allSettled([pool.end(), cache.close()]).finally(() => process.exit(0))
-  );
+  server.close(() => Promise.allSettled([pool.end(), cache.close()]).finally(() => process.exit(0)));
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

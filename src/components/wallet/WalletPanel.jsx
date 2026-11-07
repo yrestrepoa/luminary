@@ -67,7 +67,9 @@ export default function WalletPanel() {
   return (
     <div>
       {errorText && (
-        <div className="mb-4 rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">{errorText}</div>
+        <div className="mb-4 rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
+          {errorText}
+        </div>
       )}
       {notice && <NoticeBanner notice={notice} onClose={() => setNotice(null)} />}
       <section className="grid gap-4 lg:grid-cols-3">
@@ -80,7 +82,12 @@ export default function WalletPanel() {
           label="Balance XLM"
           value={loading && !balance ? '…' : balance ? fmtNumber(balance.xlm) : '—'}
           sub={
-            <a href={EXPLORER_ACCOUNT_URL + address} target="_blank" rel="noreferrer" className="font-mono hover:text-amber-200">
+            <a
+              href={EXPLORER_ACCOUNT_URL + address}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono hover:text-amber-200"
+            >
               {shortenAddress(address, 8)} ↗
             </a>
           }
@@ -95,18 +102,32 @@ export default function WalletPanel() {
           </div>
 
           {balance && !balance.funded && (
-            <button onClick={onFund} disabled={!!busy} className="rounded-xl bg-sky-400 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">
+            <button
+              onClick={onFund}
+              disabled={!!busy}
+              className="rounded-xl bg-sky-400 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
+            >
               {busy === 'fund' ? 'Fondeando…' : 'Fondear con Friendbot'}
             </button>
           )}
           {balance?.funded && !balance.hasTrustline && (
-            <button onClick={onTrust} disabled={!!busy} className="rounded-xl bg-amber-300 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">
+            <button
+              onClick={onTrust}
+              disabled={!!busy}
+              className="rounded-xl bg-amber-300 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
+            >
               {busy === 'trust' ? 'Firmando…' : 'Habilitar USDC (trustline)'}
             </button>
           )}
           {balance?.hasTrustline && (
             <form onSubmit={onSend} className="flex flex-col gap-2">
-              <input value={dest} onChange={(e) => setDest(e.target.value)} placeholder="Destino G…" required className={`${INPUT_CLASS} font-mono text-xs`} />
+              <input
+                value={dest}
+                onChange={(e) => setDest(e.target.value)}
+                placeholder="Destino G…"
+                required
+                className={`${INPUT_CLASS} font-mono text-xs`}
+              />
               <div className="flex gap-2">
                 <input
                   value={amount}
@@ -118,7 +139,10 @@ export default function WalletPanel() {
                   required
                   className={`${INPUT_CLASS} min-w-0`}
                 />
-                <button disabled={!!busy} className="shrink-0 rounded-lg bg-amber-300 px-4 text-sm font-semibold text-slate-950 disabled:opacity-50">
+                <button
+                  disabled={!!busy}
+                  className="shrink-0 rounded-lg bg-amber-300 px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                >
                   {busy === 'send' ? '…' : 'Enviar'}
                 </button>
               </div>

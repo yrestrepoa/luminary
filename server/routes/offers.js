@@ -73,7 +73,17 @@ router.post('/', requireAuth, async (req, res) => {
     `INSERT INTO offers (user_id, type, fiat_currency, fiat_price, usdc_amount, min_fiat, max_fiat, payment_method, bank)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id`,
-    [req.user.id, d.type, d.currency, d.price, d.usdcAmount, d.min ?? null, d.max ?? null, d.paymentMethod, d.bank ?? '']
+    [
+      req.user.id,
+      d.type,
+      d.currency,
+      d.price,
+      d.usdcAmount,
+      d.min ?? null,
+      d.max ?? null,
+      d.paymentMethod,
+      d.bank ?? '',
+    ]
   );
   res.status(201).json({ offer: toOffer(await findOffer(id)) });
 });

@@ -37,7 +37,10 @@ export default function Market() {
 
   const onOffer = (offer) => {
     if (offer.demo) {
-      setNotice({ kind: 'err', text: 'Oferta de demostración: inicia el backend (npm run dev) para operar con ofertas reales.' });
+      setNotice({
+        kind: 'err',
+        text: 'Oferta de demostración: inicia el backend (npm run dev) para operar con ofertas reales.',
+      });
       return;
     }
     if (!isAuthenticated) {
@@ -59,7 +62,9 @@ export default function Market() {
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
             Mercado P2P <span className="text-amber-300">fiat ⇄ USDC</span>
           </h1>
-          <p className="mt-2 max-w-2xl text-slate-400">Compra y vende USDC con tu moneda local, liquidado en Stellar Testnet.</p>
+          <p className="mt-2 max-w-2xl text-slate-400">
+            Compra y vende USDC con tu moneda local, liquidado en Stellar Testnet.
+          </p>
         </div>
         {isAuthenticated && (
           <Link
@@ -88,7 +93,10 @@ export default function Market() {
           <Spinner label="Cargando ofertas…" />
         ) : offers.length === 0 ? (
           <EmptyState title="No hay ofertas activas" text="Sé el primero en publicar una.">
-            <Link to={isAuthenticated ? ROUTES.createOffer : ROUTES.register} className="text-sm font-medium text-amber-300 hover:text-amber-200">
+            <Link
+              to={isAuthenticated ? ROUTES.createOffer : ROUTES.register}
+              className="text-sm font-medium text-amber-300 hover:text-amber-200"
+            >
               Publicar oferta
             </Link>
           </EmptyState>

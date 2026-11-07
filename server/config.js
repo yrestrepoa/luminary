@@ -40,8 +40,7 @@ export const config = {
     // Token del escrow: el SAC de USDC por defecto; ESCROW_TOKEN_ID permite otro SAC (pruebas).
     get escrowTokenId() {
       return (
-        optionalContractId('ESCROW_TOKEN_ID') ??
-        new Asset('USDC', this.usdcIssuer).contractId(this.networkPassphrase)
+        optionalContractId('ESCROW_TOKEN_ID') ?? new Asset('USDC', this.usdcIssuer).contractId(this.networkPassphrase)
       );
     },
     // Verifica on-chain (Soroban RPC) el escrow antes de cambiar el estado de un trade.

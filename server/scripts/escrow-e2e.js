@@ -102,37 +102,138 @@ check('create (vendedor) confirmado', /^[a-f0-9]{64}$/.test(fundA.hash), fundA.h
 check('vendedor descontado 10.5', (await balance(seller.publicKey())) === '89.5000000');
 
 const escrowA = await getEscrow({ contractId, seller: seller.publicKey(), tradeId: tradeA });
-check('get_escrow (frontend) → funded', escrowA?.status === 'funded' && escrowA.amount === 105000000n, JSON.stringify(escrowA, (k, v) => (typeof v === 'bigint' ? String(v) : v)));
+check(
+  'get_escrow (frontend) → funded',
+  escrowA?.status === 'funded' && escrowA.amount === 105000000n,
+  JSON.stringify(escrowA, (k, v) => (typeof v === 'bigint' ? String(v) : v))
+);
 
-const funded = await verifyEscrowFunded({ txHash: fundA.hash, ...base, tradeId: tradeA, amount: '10.5', notBefore: createdAt });
+const funded = await verifyEscrowFunded({
+  txHash: fundA.hash,
+  ...base,
+  tradeId: tradeA,
+  amount: '10.5',
+  notBefore: createdAt,
+});
 check('servidor verifica el depósito', funded.refundAfterLedger > 0, JSON.stringify(funded));
 
-await expectError('servidor rechaza monto distinto', verifyEscrowFunded({ txHash: fundA.hash, ...base, tradeId: tradeA, amount: '11', notBefore: createdAt }), /monto/);
-await expectError('servidor rechaza otro comprador', verifyEscrowFunded({ txHash: fundA.hash, ...base, buyer: issuer.publicKey(), tradeId: tradeA, amount: '10.5', notBefore: createdAt }), /comprador/);
-await expectError('servidor rechaza otro trade id', verifyEscrowFunded({ txHash: fundA.hash, ...base, tradeId: tradeA + 99n, amount: '10.5', notBefore: createdAt }), /no es un "create"/);
-await expectError('servidor rechaza hash inexistente', verifyEscrowFunded({ txHash: 'ab'.repeat(32), ...base, tradeId: tradeA, amount: '10.5', notBefore: createdAt }), /no encontrada/);
-await expectError('servidor rechaza tx anterior al trade', verifyEscrowFunded({ txHash: fundA.hash, ...base, tradeId: tradeA, amount: '10.5', notBefore: new Date(Date.now() + 3_600_000) }), /anterior/);
+await expectError(
+  'servidor rechaza monto distinto',
+  verifyEscrowFunded({ txHash: fundA.hash, ...base, tradeId: tradeA, amount: '11', notBefore: createdAt }),
+  /monto/
+);
+await expectError(
+  'servidor rechaza otro comprador',
+  verifyEscrowFunded({
+    txHash: fundA.hash,
+    ...base,
+    buyer: issuer.publicKey(),
+    tradeId: tradeA,
+    amount: '10.5',
+    notBefore: createdAt,
+  }),
+  /comprador/
+);
+await expectError(
+  'servidor rechaza otro trade id',
+  verifyEscrowFunded({ txHash: fundA.hash, ...base, tradeId: tradeA + 99n, amount: '10.5', notBefore: createdAt }),
+  /no es un "create"/
+);
+await expectError(
+  'servidor rechaza hash inexistente',
+  verifyEscrowFunded({ txHash: 'ab'.repeat(32), ...base, tradeId: tradeA, amount: '10.5', notBefore: createdAt }),
+  /no encontrada/
+);
+await expectError(
+  'servidor rechaza tx anterior al trade',
+  verifyEscrowFunded({
+    txHash: fundA.hash,
+    ...base,
+    tradeId: tradeA,
+    amount: '10.5',
+    notBefore: new Date(Date.now() + 3_600_000),
+  }),
+  /anterior/
+);
 
-await expectError('crear dos veces el mismo escrow falla', fundEscrow({ ...base, amountStroops: '1', tradeId: tradeA }, seller.secret()), /Ya existe/);
-await expectError('el comprador no puede liberar', releaseEscrow({ contractId, seller: seller.publicKey(), tradeId: tradeA }, buyer.secret()), /autorizada|Auth/);
-await expectError('el vendedor no puede reclamar antes del plazo', refundEscrow({ contractId, caller: seller.publicKey(), seller: seller.publicKey(), tradeId: tradeA }, seller.secret()), /plazo/);
-await expectError('servidor: release aún no ocurrió', verifyEscrowClosed({ txHash: fundA.hash, contractId, fn: 'release', seller: seller.publicKey(), tradeId: tradeA, notBefore: createdAt }), /no es un "release"/);
+await expectError(
+  'crear dos veces el mismo escrow falla',
+  fundEscrow({ ...base, amountStroops: '1', tradeId: tradeA }, seller.secret()),
+  /Ya existe/
+);
+await expectError(
+  'el comprador no puede liberar',
+  releaseEscrow({ contractId, seller: seller.publicKey(), tradeId: tradeA }, buyer.secret()),
+  /autorizada|Auth/
+);
+await expectError(
+  'el vendedor no puede reclamar antes del plazo',
+  refundEscrow(
+    { contractId, caller: seller.publicKey(), seller: seller.publicKey(), tradeId: tradeA },
+    seller.secret()
+  ),
+  /plazo/
+);
+await expectError(
+  'servidor: release aún no ocurrió',
+  verifyEscrowClosed({
+    txHash: fundA.hash,
+    contractId,
+    fn: 'release',
+    seller: seller.publicKey(),
+    tradeId: tradeA,
+    notBefore: createdAt,
+  }),
+  /no es un "release"/
+);
 
 const releaseA = await releaseEscrow({ contractId, seller: seller.publicKey(), tradeId: tradeA }, seller.secret());
 check('release (vendedor) confirmado', /^[a-f0-9]{64}$/.test(releaseA.hash));
 check('comprador recibió 10.5', (await balance(buyer.publicKey())) === '10.5000000');
-await verifyEscrowClosed({ txHash: releaseA.hash, contractId, fn: 'release', seller: seller.publicKey(), tradeId: tradeA, notBefore: createdAt });
+await verifyEscrowClosed({
+  txHash: releaseA.hash,
+  contractId,
+  fn: 'release',
+  seller: seller.publicKey(),
+  tradeId: tradeA,
+  notBefore: createdAt,
+});
 check('servidor verifica la liberación', true);
-await expectError('servidor rechaza release como refund', verifyEscrowClosed({ txHash: releaseA.hash, contractId, fn: 'refund', seller: seller.publicKey(), tradeId: tradeA, notBefore: createdAt }), /no es un "refund"/);
-await expectError('doble release falla', releaseEscrow({ contractId, seller: seller.publicKey(), tradeId: tradeA }, seller.secret()), /ya fue liberado/);
+await expectError(
+  'servidor rechaza release como refund',
+  verifyEscrowClosed({
+    txHash: releaseA.hash,
+    contractId,
+    fn: 'refund',
+    seller: seller.publicKey(),
+    tradeId: tradeA,
+    notBefore: createdAt,
+  }),
+  /no es un "refund"/
+);
+await expectError(
+  'doble release falla',
+  releaseEscrow({ contractId, seller: seller.publicKey(), tradeId: tradeA }, seller.secret()),
+  /ya fue liberado/
+);
 
 // ---------------------------------------------------------------- 2) create → refund (comprador)
 const fundB = await fundEscrow({ ...base, amountStroops: '20000000', tradeId: tradeB }, seller.secret());
 check('create B confirmado', Boolean(fundB.hash));
-const refundB = await refundEscrow({ contractId, caller: buyer.publicKey(), seller: seller.publicKey(), tradeId: tradeB }, buyer.secret());
+const refundB = await refundEscrow(
+  { contractId, caller: buyer.publicKey(), seller: seller.publicKey(), tradeId: tradeB },
+  buyer.secret()
+);
 check('refund (comprador) confirmado', Boolean(refundB.hash));
 check('vendedor recuperó los 2 LUMT', (await balance(seller.publicKey())) === '89.5000000');
-await verifyEscrowClosed({ txHash: refundB.hash, contractId, fn: 'refund', seller: seller.publicKey(), tradeId: tradeB, notBefore: createdAt });
+await verifyEscrowClosed({
+  txHash: refundB.hash,
+  contractId,
+  fn: 'refund',
+  seller: seller.publicKey(),
+  tradeId: tradeB,
+  notBefore: createdAt,
+});
 check('servidor verifica el reembolso', true);
 const stateB = await readEscrow({ contractId, seller: seller.publicKey(), tradeId: tradeB });
 check('get_escrow (servidor) → refunded', stateB?.status === 'refunded');

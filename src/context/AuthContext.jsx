@@ -19,7 +19,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     // Cualquier 401 de la API invalida la sesión local.
     setUnauthorizedHandler(() => applyUser(null));
-    authApi.getMe().then(applyUser).catch(() => applyUser(null));
+    authApi
+      .getMe()
+      .then(applyUser)
+      .catch(() => applyUser(null));
     return () => setUnauthorizedHandler(null);
   }, [applyUser]);
 

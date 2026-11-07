@@ -12,9 +12,7 @@ export async function checkBalance(publicKey) {
   try {
     const account = await server.loadAccount(publicKey);
     const native = account.balances.find((b) => b.asset_type === 'native');
-    const usdc = account.balances.find(
-      (b) => b.asset_code === USDC_CODE && b.asset_issuer === USDC_ISSUER
-    );
+    const usdc = account.balances.find((b) => b.asset_code === USDC_CODE && b.asset_issuer === USDC_ISSUER);
     return {
       funded: true,
       xlm: native?.balance ?? '0',

@@ -10,7 +10,9 @@ export function WalletProvider({ children }) {
 
   // Reconexión silenciosa si el sitio ya estaba autorizado
   useEffect(() => {
-    getConnectedAddress().then((a) => a && setAddress(a)).catch(() => {});
+    getConnectedAddress()
+      .then((a) => a && setAddress(a))
+      .catch(() => {});
   }, []);
 
   const connect = useCallback(async () => {

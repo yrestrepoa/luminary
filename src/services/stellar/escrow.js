@@ -34,10 +34,11 @@ const addr = (a) => new Address(a).toScVal();
 
 /** Traduce errores de simulación/envío a mensajes legibles (errores del contrato por código). */
 export function escrowError(err) {
-  const msg = typeof err === 'string' ? err : err?.message ?? String(err);
+  const msg = typeof err === 'string' ? err : (err?.message ?? String(err));
   const code = /Error\(Contract, #(\d+)\)/.exec(msg)?.[1];
   if (code && CONTRACT_ERRORS[code]) return new Error(CONTRACT_ERRORS[code]);
-  if (/trustline|TrustlineMissing|Error\(Contract, #13\)/i.test(msg)) return new Error('Falta la trustline USDC en una de las cuentas');
+  if (/trustline|TrustlineMissing|Error\(Contract, #13\)/i.test(msg))
+    return new Error('Falta la trustline USDC en una de las cuentas');
   if (/balance|Error\(Contract, #10\)/i.test(msg)) return new Error('Balance USDC insuficiente');
   if (/Error\(Auth/.test(msg)) return new Error('Firma no autorizada para esta acción');
   return new Error(`Transacción rechazada: ${msg.slice(0, 240)}`);
@@ -68,7 +69,9 @@ async function invoke(signerInput, contractId, method, args, { onSubmitted } = {
   const others = (prepared.operations[0].auth ?? [])
     .map((entry) => entry.credentials)
     .filter((cred) => cred.type !== 'sorobanCredentialsSourceAccount')
-    .map((cred) => Address.fromScAddress((cred.address ?? cred.addressV2 ?? cred.addressWithDelegates).address).toString())
+    .map((cred) =>
+      Address.fromScAddress((cred.address ?? cred.addressV2 ?? cred.addressWithDelegates).address).toString()
+    )
     .filter((a) => a !== signer.publicKey);
   if (others.length) throw new Error(`Firma no autorizada para esta acción: requiere la cuenta ${others[0]}`);
 
@@ -80,14 +83,23 @@ async function invoke(signerInput, contractId, method, args, { onSubmitted } = {
   onSubmitted?.(sent.hash);
 
   const res = await sorobanServer.pollTransaction(sent.hash, { attempts: 30, sleepStrategy: () => 1_000 });
-  if (res.status === 'NOT_FOUND') throw new Error(`Transacción enviada (${sent.hash}) pero aún sin confirmar; reintenta el registro en unos segundos`);
+  if (res.status === 'NOT_FOUND')
+    throw new Error(
+      `Transacción enviada (${sent.hash}) pero aún sin confirmar; reintenta el registro en unos segundos`
+    );
   if (res.status !== 'SUCCESS') throw new Error(`La transacción falló on-chain (${sent.hash})`);
   return { hash: sent.hash, result: res.returnValue ? scValToNative(res.returnValue) : null };
 }
 
 /** Vendedor: deposita `amountStroops` del token en el escrow del trade. */
 export function fundEscrow({ contractId, tokenId, seller, buyer, amountStroops, tradeId }, signer, opts) {
-  return invoke(signer, contractId, 'create', [addr(seller), addr(buyer), addr(tokenId), i128(amountStroops), u64(tradeId)], opts);
+  return invoke(
+    signer,
+    contractId,
+    'create',
+    [addr(seller), addr(buyer), addr(tokenId), i128(amountStroops), u64(tradeId)],
+    opts
+  );
 }
 
 /** Vendedor: libera el USDC al comprador. */

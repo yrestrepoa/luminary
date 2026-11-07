@@ -49,7 +49,9 @@ function OffersTab() {
       {notice && <NoticeBanner notice={notice} onClose={() => setNotice(null)} />}
       {!offers?.length ? (
         <EmptyState title="No has publicado ofertas" text="Publica una oferta para comprar o vender USDC.">
-          <Link to={ROUTES.createOffer} className="text-sm font-medium text-amber-300 hover:text-amber-200">Publicar oferta</Link>
+          <Link to={ROUTES.createOffer} className="text-sm font-medium text-amber-300 hover:text-amber-200">
+            Publicar oferta
+          </Link>
         </EmptyState>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-white/5 bg-slate-900/60">
@@ -69,26 +71,52 @@ function OffersTab() {
               {offers.map((o) => (
                 <tr key={o.id}>
                   <td className="px-5 py-3">
-                    <span className={o.type === 'sell' ? 'text-rose-300' : 'text-emerald-300'}>{o.type === 'sell' ? 'Venta' : 'Compra'}</span>
+                    <span className={o.type === 'sell' ? 'text-rose-300' : 'text-emerald-300'}>
+                      {o.type === 'sell' ? 'Venta' : 'Compra'}
+                    </span>
                   </td>
                   <td className="px-5 py-3 tabular-nums">{fmtFiat(o.price, o.currency)}</td>
                   <td className="px-5 py-3 tabular-nums">{fmtNumber(o.available, 7)} USDC</td>
-                  <td className="px-5 py-3">{o.paymentMethod}{o.bank && <span className="text-slate-500"> · {o.bank}</span>}</td>
-                  <td className="px-5 py-3"><StatusBadge status={o.status} map={OFFER_STATUS} /></td>
+                  <td className="px-5 py-3">
+                    {o.paymentMethod}
+                    {o.bank && <span className="text-slate-500"> · {o.bank}</span>}
+                  </td>
+                  <td className="px-5 py-3">
+                    <StatusBadge status={o.status} map={OFFER_STATUS} />
+                  </td>
                   <td className="px-5 py-3 text-slate-400">{fmtDate(o.createdAt)}</td>
                   <td className="px-5 py-3">
                     {o.status !== 'closed' && (
                       <div className="flex justify-end gap-1">
                         {o.status === 'active' ? (
-                          <Button variant="ghost" disabled={busy === o.id} onClick={() => act(o, () => offersApi.updateOffer(o.id, { status: 'paused' }), 'Oferta pausada')}>Pausar</Button>
+                          <Button
+                            variant="ghost"
+                            disabled={busy === o.id}
+                            onClick={() =>
+                              act(o, () => offersApi.updateOffer(o.id, { status: 'paused' }), 'Oferta pausada')
+                            }
+                          >
+                            Pausar
+                          </Button>
                         ) : (
-                          <Button variant="ghost" disabled={busy === o.id} onClick={() => act(o, () => offersApi.updateOffer(o.id, { status: 'active' }), 'Oferta reactivada')}>Activar</Button>
+                          <Button
+                            variant="ghost"
+                            disabled={busy === o.id}
+                            onClick={() =>
+                              act(o, () => offersApi.updateOffer(o.id, { status: 'active' }), 'Oferta reactivada')
+                            }
+                          >
+                            Activar
+                          </Button>
                         )}
                         <Button
                           variant="ghost"
                           className="hover:!text-rose-300"
                           disabled={busy === o.id}
-                          onClick={() => window.confirm('¿Cerrar esta oferta? No se puede reabrir.') && act(o, () => offersApi.closeOffer(o.id), 'Oferta cerrada')}
+                          onClick={() =>
+                            window.confirm('¿Cerrar esta oferta? No se puede reabrir.') &&
+                            act(o, () => offersApi.closeOffer(o.id), 'Oferta cerrada')
+                          }
                         >
                           Cerrar
                         </Button>
@@ -119,7 +147,10 @@ function HistoryTab() {
       {loading ? (
         <Spinner />
       ) : !trades?.length ? (
-        <EmptyState title="Sin operaciones" text={status === 'all' ? 'Aún no has operado.' : 'No hay operaciones con este estado.'} />
+        <EmptyState
+          title="Sin operaciones"
+          text={status === 'all' ? 'Aún no has operado.' : 'No hay operaciones con este estado.'}
+        />
       ) : (
         <TradeList trades={trades} userId={user.id} />
       )}
@@ -136,7 +167,10 @@ export default function MyOffers() {
       <PageHeader
         title="Mis ofertas e historial"
         action={
-          <Link to={ROUTES.createOffer} className="rounded-xl bg-gradient-to-r from-amber-300 to-orange-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-orange-500/20 hover:brightness-110">
+          <Link
+            to={ROUTES.createOffer}
+            className="rounded-xl bg-gradient-to-r from-amber-300 to-orange-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-orange-500/20 hover:brightness-110"
+          >
             + Publicar oferta
           </Link>
         }

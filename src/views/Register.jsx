@@ -51,14 +51,52 @@ export default function Register() {
     <AuthCard
       title="Crea tu cuenta"
       subtitle="Compra y vende USDC con tu moneda local."
-      footer={<>¿Ya tienes cuenta? <AuthLink to={ROUTES.login}>Inicia sesión</AuthLink></>}
+      footer={
+        <>
+          ¿Ya tienes cuenta? <AuthLink to={ROUTES.login}>Inicia sesión</AuthLink>
+        </>
+      }
     >
       <ErrorBanner>{error}</ErrorBanner>
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
-        <FormField label="Nombre visible" name="displayName" autoComplete="nickname" maxLength={60} value={form.displayName} onChange={onChange} error={details.displayName} hint="Así te verán otros usuarios en el mercado." />
-        <FormField label="Email" name="email" type="email" autoComplete="email" value={form.email} onChange={onChange} error={details.email} />
-        <FormField label="Contraseña" name="password" type="password" autoComplete="new-password" value={form.password} onChange={onChange} error={details.password} hint="Mínimo 8 caracteres." />
-        <FormField label="Confirmar contraseña" name="confirm" type="password" autoComplete="new-password" value={form.confirm} onChange={onChange} error={details.confirm} />
+        <FormField
+          label="Nombre visible"
+          name="displayName"
+          autoComplete="nickname"
+          maxLength={60}
+          value={form.displayName}
+          onChange={onChange}
+          error={details.displayName}
+          hint="Así te verán otros usuarios en el mercado."
+        />
+        <FormField
+          label="Email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          value={form.email}
+          onChange={onChange}
+          error={details.email}
+        />
+        <FormField
+          label="Contraseña"
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          value={form.password}
+          onChange={onChange}
+          error={details.password}
+          hint="Mínimo 8 caracteres."
+        />
+        <FormField
+          label="Confirmar contraseña"
+          name="confirm"
+          type="password"
+          autoComplete="new-password"
+          value={form.confirm}
+          onChange={onChange}
+          error={details.confirm}
+        />
         <Button type="submit" loading={loading} loadingText="Creando cuenta…" className="mt-2 py-2.5">
           Crear cuenta
         </Button>

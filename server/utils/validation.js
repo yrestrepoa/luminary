@@ -32,11 +32,11 @@ export class Validator {
   string(field, { min = 1, max = 255, optional = false, trim = true, pattern, patternMsg } = {}) {
     let v = this.#raw(field, { optional });
     if (v === undefined) return this;
-    if (typeof v !== 'string') return this.#fail(field, 'Debe ser texto'), this;
+    if (typeof v !== 'string') return (this.#fail(field, 'Debe ser texto'), this);
     if (trim) v = v.trim();
-    if (v.length < min) return this.#fail(field, `Mínimo ${min} caracteres`), this;
-    if (v.length > max) return this.#fail(field, `Máximo ${max} caracteres`), this;
-    if (pattern && !pattern.test(v)) return this.#fail(field, patternMsg ?? 'Formato inválido'), this;
+    if (v.length < min) return (this.#fail(field, `Mínimo ${min} caracteres`), this);
+    if (v.length > max) return (this.#fail(field, `Máximo ${max} caracteres`), this);
+    if (pattern && !pattern.test(v)) return (this.#fail(field, patternMsg ?? 'Formato inválido'), this);
     this.out[field] = v;
     return this;
   }
@@ -52,14 +52,15 @@ export class Validator {
     const v = this.#raw(field, { optional });
     if (v === undefined) return this;
     const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
-    if (!Number.isFinite(n)) return this.#fail(field, 'Debe ser un número'), this;
-    if (integer && !Number.isSafeInteger(n)) return this.#fail(field, 'Debe ser un entero'), this;
+    if (!Number.isFinite(n)) return (this.#fail(field, 'Debe ser un número'), this);
+    if (integer && !Number.isSafeInteger(n)) return (this.#fail(field, 'Debe ser un entero'), this);
     if (decimals !== undefined && Math.abs(Math.round(n * 10 ** decimals) - n * 10 ** decimals) > 1e-6) {
-      return this.#fail(field, `Máximo ${decimals} decimales`), this;
+      return (this.#fail(field, `Máximo ${decimals} decimales`), this);
     }
-    if (exclusiveMin !== undefined && n <= exclusiveMin) return this.#fail(field, `Debe ser mayor que ${exclusiveMin}`), this;
-    if (min !== undefined && n < min) return this.#fail(field, `Mínimo ${min}`), this;
-    if (max !== undefined && n > max) return this.#fail(field, `Máximo ${max}`), this;
+    if (exclusiveMin !== undefined && n <= exclusiveMin)
+      return (this.#fail(field, `Debe ser mayor que ${exclusiveMin}`), this);
+    if (min !== undefined && n < min) return (this.#fail(field, `Mínimo ${min}`), this);
+    if (max !== undefined && n > max) return (this.#fail(field, `Máximo ${max}`), this);
     this.out[field] = n;
     return this;
   }
@@ -67,13 +68,19 @@ export class Validator {
   oneOf(field, values, { optional = false } = {}) {
     const v = this.#raw(field, { optional });
     if (v === undefined) return this;
-    if (!values.includes(v)) return this.#fail(field, `Debe ser uno de: ${values.join(', ')}`), this;
+    if (!values.includes(v)) return (this.#fail(field, `Debe ser uno de: ${values.join(', ')}`), this);
     this.out[field] = v;
     return this;
   }
 
   currency(field, opts) {
-    return this.string(field, { min: 3, max: 3, pattern: CURRENCY_RE, patternMsg: 'Código ISO 4217 (p.ej. COP)', ...opts });
+    return this.string(field, {
+      min: 3,
+      max: 3,
+      pattern: CURRENCY_RE,
+      patternMsg: 'Código ISO 4217 (p.ej. COP)',
+      ...opts,
+    });
   }
 
   /** Dirección Stellar G…; `null` explícito se acepta para desvincular. */

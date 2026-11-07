@@ -14,7 +14,16 @@ import { FIAT_CURRENCIES } from '../constants/offers.js';
 import { ROUTES } from '../constants/routes.js';
 import { fmtNumber } from '../utils/format.js';
 
-const INITIAL = { type: 'sell', currency: 'COP', price: '', usdcAmount: '', min: '', max: '', paymentMethod: '', bank: '' };
+const INITIAL = {
+  type: 'sell',
+  currency: 'COP',
+  price: '',
+  usdcAmount: '',
+  min: '',
+  max: '',
+  paymentMethod: '',
+  bank: '',
+};
 const toNum = (v) => (v === '' ? undefined : Number(v));
 
 export default function CreateOffer() {
@@ -75,7 +84,10 @@ export default function CreateOffer() {
 
   return (
     <>
-      <PageHeader title="Publicar oferta" subtitle="Define precio, cantidad y método de pago. Podrás pausarla o cerrarla cuando quieras." />
+      <PageHeader
+        title="Publicar oferta"
+        subtitle="Define precio, cantidad y método de pago. Podrás pausarla o cerrarla cuando quieras."
+      />
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <Card>
           <ErrorBanner>{error}</ErrorBanner>
@@ -85,7 +97,11 @@ export default function CreateOffer() {
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { key: 'sell', label: 'Vender USDC', active: 'border-rose-400/50 bg-rose-400/10 text-rose-200' },
-                  { key: 'buy', label: 'Comprar USDC', active: 'border-emerald-400/50 bg-emerald-400/10 text-emerald-200' },
+                  {
+                    key: 'buy',
+                    label: 'Comprar USDC',
+                    active: 'border-emerald-400/50 bg-emerald-400/10 text-emerald-200',
+                  },
                 ].map((t) => (
                   <button
                     key={t.key}
@@ -102,17 +118,38 @@ export default function CreateOffer() {
             {!sells && !user.stellarAddress && (
               <div className="rounded-xl border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-100">
                 Para comprar USDC necesitas una dirección Stellar vinculada.{' '}
-                <Link to={ROUTES.profile} className="font-semibold underline">Vincular</Link>
+                <Link to={ROUTES.profile} className="font-semibold underline">
+                  Vincular
+                </Link>
               </div>
             )}
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Moneda fiat" name="currency" as="select" value={form.currency} onChange={onChange} error={details.currency}>
+              <FormField
+                label="Moneda fiat"
+                name="currency"
+                as="select"
+                value={form.currency}
+                onChange={onChange}
+                error={details.currency}
+              >
                 {FIAT_CURRENCIES.map((c) => (
-                  <option key={c.code} value={c.code}>{c.code} · {c.label}</option>
+                  <option key={c.code} value={c.code}>
+                    {c.code} · {c.label}
+                  </option>
                 ))}
               </FormField>
-              <FormField label={`Precio por 1 USDC (${form.currency})`} name="price" type="number" min="0" step="0.0001" required value={form.price} onChange={onChange} error={details.price} />
+              <FormField
+                label={`Precio por 1 USDC (${form.currency})`}
+                name="price"
+                type="number"
+                min="0"
+                step="0.0001"
+                required
+                value={form.price}
+                onChange={onChange}
+                error={details.price}
+              />
               <FormField
                 label="Cantidad de USDC"
                 name="usdcAmount"
@@ -132,16 +169,54 @@ export default function CreateOffer() {
                 }
               />
               <div className="grid grid-cols-2 gap-2">
-                <FormField label="Mín. fiat" name="min" type="number" min="0" step="0.01" value={form.min} onChange={onChange} error={details.min} />
-                <FormField label="Máx. fiat" name="max" type="number" min="0" step="0.01" value={form.max} onChange={onChange} error={details.max} />
+                <FormField
+                  label="Mín. fiat"
+                  name="min"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.min}
+                  onChange={onChange}
+                  error={details.min}
+                />
+                <FormField
+                  label="Máx. fiat"
+                  name="max"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.max}
+                  onChange={onChange}
+                  error={details.max}
+                />
               </div>
-              <FormField label="Método de pago" name="paymentMethod" required maxLength={60} placeholder="Transferencia, Nequi, SPEI…" value={form.paymentMethod} onChange={onChange} error={details.paymentMethod} />
-              <FormField label="Banco (opcional)" name="bank" maxLength={60} value={form.bank} onChange={onChange} error={details.bank} />
+              <FormField
+                label="Método de pago"
+                name="paymentMethod"
+                required
+                maxLength={60}
+                placeholder="Transferencia, Nequi, SPEI…"
+                value={form.paymentMethod}
+                onChange={onChange}
+                error={details.paymentMethod}
+              />
+              <FormField
+                label="Banco (opcional)"
+                name="bank"
+                maxLength={60}
+                value={form.bank}
+                onChange={onChange}
+                error={details.bank}
+              />
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancelar</Button>
-              <Button type="submit" loading={loading} loadingText="Publicando…">Publicar oferta</Button>
+              <Button type="button" variant="secondary" onClick={() => navigate(-1)}>
+                Cancelar
+              </Button>
+              <Button type="submit" loading={loading} loadingText="Publicando…">
+                Publicar oferta
+              </Button>
             </div>
           </form>
         </Card>

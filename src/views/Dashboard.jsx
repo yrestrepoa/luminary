@@ -14,7 +14,8 @@ import { offersApi, tradesApi } from '../services/api/index.js';
 import { ROUTES } from '../constants/routes.js';
 import { fmtNumber } from '../utils/format.js';
 
-const loadActivity = () => Promise.all([offersApi.listMyOffers(), tradesApi.listTrades()]).then(([offers, trades]) => ({ offers, trades }));
+const loadActivity = () =>
+  Promise.all([offersApi.listMyOffers(), tradesApi.listTrades()]).then(([offers, trades]) => ({ offers, trades }));
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -35,10 +36,16 @@ export default function Dashboard() {
         subtitle="Tu wallet y tu actividad en Luminary."
         action={
           <div className="flex gap-2">
-            <Link to={ROUTES.market} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10">
+            <Link
+              to={ROUTES.market}
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
+            >
               Ir al mercado
             </Link>
-            <Link to={ROUTES.createOffer} className="rounded-xl bg-gradient-to-r from-amber-300 to-orange-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-orange-500/20 hover:brightness-110">
+            <Link
+              to={ROUTES.createOffer}
+              className="rounded-xl bg-gradient-to-r from-amber-300 to-orange-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-orange-500/20 hover:brightness-110"
+            >
               + Publicar oferta
             </Link>
           </div>
@@ -48,7 +55,9 @@ export default function Dashboard() {
       {!user.stellarAddress && (
         <div className="mb-6 rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
           Aún no vinculaste una dirección Stellar: la necesitas para recibir USDC.{' '}
-          <Link to={ROUTES.profile} className="font-semibold underline">Vincular ahora</Link>
+          <Link to={ROUTES.profile} className="font-semibold underline">
+            Vincular ahora
+          </Link>
         </div>
       )}
       {walletMismatch && (
@@ -70,7 +79,11 @@ export default function Dashboard() {
         ) : (
           <>
             <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Stat label="Ofertas activas" value={offers.filter((o) => o.status === 'active').length} sub={`${offers.length} en total`} />
+              <Stat
+                label="Ofertas activas"
+                value={offers.filter((o) => o.status === 'active').length}
+                sub={`${offers.length} en total`}
+              />
               <Stat label="Operaciones abiertas" value={open.length} sub="Pendientes, pagadas o en disputa" />
               <Stat label="Completadas" value={completed.length} />
               <Stat label="Volumen" value={fmtNumber(volume)} sub="USDC liquidados" />

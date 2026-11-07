@@ -1,11 +1,4 @@
-import {
-  isConnected,
-  isAllowed,
-  requestAccess,
-  getAddress,
-  getNetwork,
-  signTransaction,
-} from '@stellar/freighter-api';
+import { isConnected, isAllowed, requestAccess, getAddress, getNetwork, signTransaction } from '@stellar/freighter-api';
 import { NETWORK_PASSPHRASE } from '../../config/stellar.js';
 
 /**

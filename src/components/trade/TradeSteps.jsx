@@ -12,7 +12,9 @@ export default function TradeSteps({ status }) {
         const active = !halted && i === current && status !== 'released';
         return (
           <li key={step.key} className="flex flex-col gap-2">
-            <span className={`h-1.5 rounded-full ${done ? 'bg-emerald-400' : active ? 'bg-amber-300' : 'bg-white/10'}`} />
+            <span
+              className={`h-1.5 rounded-full ${done ? 'bg-emerald-400' : active ? 'bg-amber-300' : 'bg-white/10'}`}
+            />
             <span className={`text-xs ${done || active ? 'text-slate-200' : 'text-slate-500'}`}>
               {done ? '✓ ' : ''}
               {step.label}

@@ -155,7 +155,9 @@ class RedisBackend {
       ]);
       return true;
     } catch (err) {
-      console.error(`[cache] No se pudo conectar a Redis (${err.message}); se reintentará. Rutas de sesión/login → 503 hasta entonces.`);
+      console.error(
+        `[cache] No se pudo conectar a Redis (${err.message}); se reintentará. Rutas de sesión/login → 503 hasta entonces.`
+      );
       return false;
     } finally {
       clearTimeout(timer);
@@ -244,7 +246,9 @@ export function createCache(url = config.redisUrl) {
           '[cache] REDIS_URL no definido: rate limit y revocación de tokens en MEMORIA del proceso ' +
             '(no se comparten entre procesos ni sobreviven a reinicios). Usa Redis en producción.'
         );
-        console.warn('[cache] ⚠ Un logout solo invalida el token en ESTE proceso; tras reiniciar, los tokens revocados vuelven a ser válidos hasta expirar.');
+        console.warn(
+          '[cache] ⚠ Un logout solo invalida el token en ESTE proceso; tras reiniciar, los tokens revocados vuelven a ser válidos hasta expirar.'
+        );
       }
     },
     get: (key) => backend.get(k(key)),

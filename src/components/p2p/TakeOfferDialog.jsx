@@ -37,8 +37,17 @@ export default function TakeOfferDialog({ offer, user, onConfirm, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-slate-950/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="take-offer-title" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-30 grid place-items-center bg-slate-950/80 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="take-offer-title"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <h2 id="take-offer-title" className="text-lg font-semibold">
@@ -48,14 +57,18 @@ export default function TakeOfferDialog({ offer, user, onConfirm, onClose }) {
               {fmtFiat(offer.price, offer.currency)} por USDC · disponible {fmtNumber(offer.available, 7)} USDC
             </p>
           </div>
-          <button onClick={onClose} className="opacity-60 hover:opacity-100" aria-label="Cerrar">✕</button>
+          <button onClick={onClose} className="opacity-60 hover:opacity-100" aria-label="Cerrar">
+            ✕
+          </button>
         </div>
 
         <ErrorBanner>{error}</ErrorBanner>
         {needsAddress ? (
           <div className="rounded-xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
             Para recibir USDC necesitas vincular tu dirección Stellar.{' '}
-            <Link to={ROUTES.profile} className="font-semibold underline">Ir a mi perfil</Link>
+            <Link to={ROUTES.profile} className="font-semibold underline">
+              Ir a mi perfil
+            </Link>
           </div>
         ) : (
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -86,7 +99,13 @@ export default function TakeOfferDialog({ offer, user, onConfirm, onClose }) {
                 ? `Pagarás por ${offer.paymentMethod}${offer.bank ? ` (${offer.bank})` : ''}; el vendedor libera los USDC a tu dirección vinculada.`
                 : 'Recibirás el pago fiat del comprador y luego liberarás los USDC desde tu wallet Freighter.'}
             </p>
-            <Button type="submit" variant={userBuys ? 'success' : 'danger'} loading={loading} loadingText="Abriendo operación…" className="py-2.5">
+            <Button
+              type="submit"
+              variant={userBuys ? 'success' : 'danger'}
+              loading={loading}
+              loadingText="Abriendo operación…"
+              className="py-2.5"
+            >
               Abrir operación
             </Button>
           </form>

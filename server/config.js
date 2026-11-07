@@ -241,6 +241,10 @@ export function loadConfig(env = process.env) {
       pendingTtlMs: int(env, 'PENDING_TRADE_TTL_MINUTES', 30, { min: 0, max: 7 * 24 * 60 }, problems) * 60_000,
       // Cada cuánto corre el barrido de expiración en cada proceso de la API.
       expiryIntervalMs: int(env, 'TRADE_EXPIRY_INTERVAL_SECONDS', 60, { min: 5, max: 3600 }, problems) * 1000,
+      // Plazo tras el depósito a partir del cual el VENDEDOR puede reembolsarse (contrato:
+      // REFUND_TIMEOUT_LEDGERS = 17 280 ledgers ≈ 24 h). Solo se usa sin verificación on-chain;
+      // con VERIFY_STELLAR_TX=true manda el ledger real de la tx de refund.
+      sellerRefundAfterMs: 17_280 * 5_000,
     },
     // Cookies Secure en producción (requiere HTTPS delante; localhost es contexto seguro).
     cookieSecure: isProd,

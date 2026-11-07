@@ -1,5 +1,5 @@
 // Trades con verificación on-chain ACTIVADA contra un Soroban RPC simulado (XDR real).
-import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createSellOffer, describeIntegration, fakeHash, registerUser } from '../helpers/app.js';
 import {
   createArgs,
@@ -149,5 +149,50 @@ describeIntegration('escrow verification (mocked Soroban RPC)', (ctx) => {
     expect(res.body.trade.status).toBe('refunded');
     const offer = (await buyer.agent.get(`/api/offers/${t.offerId}`).expect(200)).body.offer;
     expect(offer.available).toBe(10);
+  });
+
+  describe('disputed trades (audit I1)', () => {
+    const disputed = async () => {
+      const t = await open(1);
+      const fundHash = fakeHash();
+      mockSorobanRpc({ txs: { [fundHash]: successTx(createEnv(t)) }, escrow: escrowFor(t) });
+      await seller.agent.post(`/api/trades/${t.id}/fund`).send({ txHash: fundHash }).expect(200);
+      vi.restoreAllMocks();
+      await buyer.agent.post(`/api/trades/${t.id}/paid`).expect(200);
+      await buyer.agent.post(`/api/trades/${t.id}/dispute`).expect(200);
+      return t;
+    };
+    const refundBy = (t, caller, ledger) => {
+      const hash = fakeHash();
+      const env = invocationEnvelope({
+        contractId,
+        fn: 'refund',
+        source: caller,
+        args: refundArgs({ caller, seller: seller.user.stellarAddress, tradeId: t.id }),
+      });
+      mockSorobanRpc({ txs: { [hash]: successTx(env, { ledger }) }, escrow: escrowFor(t, { status: 'refunded' }) });
+      return hash;
+    };
+
+    it('rejects a seller refund executed before refund_after_ledger', async () => {
+      const t = await disputed();
+      const hash = refundBy(t, seller.user.stellarAddress, 98764); // refundAfterLedger = 98765
+      const res = await seller.agent.post(`/api/trades/${t.id}/refund`).send({ txHash: hash }).expect(409);
+      expect(res.body.error).toMatch(/plazo del contrato/);
+    });
+
+    it('accepts a seller refund executed at/after refund_after_ledger', async () => {
+      const t = await disputed();
+      const hash = refundBy(t, seller.user.stellarAddress, 98765);
+      const res = await seller.agent.post(`/api/trades/${t.id}/refund`).send({ txHash: hash }).expect(200);
+      expect(res.body.trade.status).toBe('refunded');
+    });
+
+    it('accepts an early refund made on-chain by the buyer, whoever reports it', async () => {
+      const t = await disputed();
+      const hash = refundBy(t, buyer.user.stellarAddress, 600);
+      const res = await seller.agent.post(`/api/trades/${t.id}/refund`).send({ txHash: hash }).expect(200);
+      expect(res.body.trade.status).toBe('refunded');
+    });
   });
 });

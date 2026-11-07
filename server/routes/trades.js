@@ -196,6 +196,7 @@ router.post('/:id/fund', async (req, res) => {
       escrow_seller: trade.seller_address,
       escrow_buyer: trade.buyer_address,
       escrow_refund_after_ledger: refundAfterLedger,
+      funded_at: new Date(),
     },
   });
 });
@@ -205,6 +206,11 @@ router.post('/:id/paid', async (req, res) =>
   transition(req, res, { trade: await loadTrade(req), from: ['funded'], to: 'paid', role: 'buyer' })
 );
 
+const disputeRefundTooEarly = () =>
+  conflict(
+    'Operación en disputa: el vendedor solo puede reembolsarse cuando vence el plazo del contrato (~24 h desde el depósito); el comprador sí puede reembolsar antes'
+  );
+
 /** Cierre on-chain verificado: `release` (USDC → comprador) o `refund` (USDC → vendedor). */
 async function closeEscrow(req, res, { fn, to, role, onApplied }) {
   const { txHash } = validate(req.body).txHash('txHash').done();
@@ -212,9 +218,12 @@ async function closeEscrow(req, res, { fn, to, role, onApplied }) {
   if (role === 'seller' && trade.seller_id !== req.user.id) throw forbidden('Solo el vendedor puede hacer esto');
   if (!ESCROWED.includes(trade.status)) throw conflict(`No permitido en estado "${trade.status}"`);
 
+  // Auditoría I1: en disputa, el reembolso del VENDEDOR sigue la regla del contrato (solo tras
+  // refund_after_ledger); el del comprador se permite siempre.
+  const disputedRefund = fn === 'refund' && trade.status === 'disputed';
   if (config.stellar.verifyTx) {
     if (!trade.escrow_contract_id) throw conflict('Esta operación no tiene escrow on-chain registrado');
-    await verifyEscrowClosed({
+    const { args, ledger } = await verifyEscrowClosed({
       txHash,
       fn,
       contractId: trade.escrow_contract_id,
@@ -222,6 +231,15 @@ async function closeEscrow(req, res, { fn, to, role, onApplied }) {
       tradeId: trade.id,
       notBefore: trade.created_at,
     });
+    // On-chain manda quién llamó a `refund` y en qué ledger (el contrato ya lo impide; defensa extra).
+    const deadline = trade.escrow_refund_after_ledger;
+    if (disputedRefund && args[0] === trade.escrow_seller && deadline !== null && ledger < deadline) {
+      throw disputeRefundTooEarly();
+    }
+  } else if (disputedRefund && trade.seller_id === req.user.id) {
+    // Sin verificación on-chain (solo desarrollo/pruebas): se replica el plazo con el reloj.
+    const since = new Date(trade.funded_at ?? trade.updated_at).getTime();
+    if (Date.now() < since + config.trades.sellerRefundAfterMs) throw disputeRefundTooEarly();
   }
   await transition(req, res, { trade, from: ESCROWED, to, role, set: { stellar_tx_hash: txHash }, onApplied });
 }

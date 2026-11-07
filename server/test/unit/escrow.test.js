@@ -144,7 +144,7 @@ describe('verifyEscrowClosed', () => {
     mockSorobanRpc({ txs: { [hash('c')]: successTx(env) }, escrow: fundedEscrow({ status: 'released' }) });
     await expect(
       verifyEscrowClosed({ txHash: hash('c'), contractId, fn: 'release', seller, tradeId, notBefore })
-    ).resolves.toBeUndefined();
+    ).resolves.toMatchObject({ ledger: 500, args: [seller, BigInt(tradeId)] });
   });
 
   it('accepts a buyer refund (seller is the 2nd argument)', async () => {
@@ -157,7 +157,7 @@ describe('verifyEscrowClosed', () => {
     mockSorobanRpc({ txs: { [hash('d')]: successTx(env) }, escrow: fundedEscrow({ status: 'refunded' }) });
     await expect(
       verifyEscrowClosed({ txHash: hash('d'), contractId, fn: 'refund', seller, tradeId, notBefore })
-    ).resolves.toBeUndefined();
+    ).resolves.toMatchObject({ ledger: 500, args: [expect.any(String), seller, BigInt(tradeId)] });
   });
 
   it('rejects when on-chain state does not match the claimed outcome', async () => {

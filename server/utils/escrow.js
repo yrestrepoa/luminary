@@ -145,9 +145,12 @@ export async function verifyEscrowFunded({ txHash, contractId, tokenId, seller, 
   return { refundAfterLedger: escrow.refundAfterLedger };
 }
 
-/** Verifica el cierre: tx `release`/`refund` válida y escrow on-chain en el estado final correspondiente. */
+/**
+ * Verifica el cierre: tx `release`/`refund` válida y escrow on-chain en el estado final
+ * correspondiente. Devuelve `{ args, ledger }` de la invocación (en `refund`, args[0] = caller).
+ */
 export async function verifyEscrowClosed({ txHash, contractId, fn, seller, tradeId, notBefore }) {
-  await verifyInvocation({ txHash, contractId, fn, seller, tradeId, notBefore });
+  const invocation = await verifyInvocation({ txHash, contractId, fn, seller, tradeId, notBefore });
   const escrow = await readEscrow({ contractId, seller, tradeId });
   const expected = fn === 'release' ? 'released' : 'refunded';
   if (escrow?.status !== expected) {
@@ -155,4 +158,5 @@ export async function verifyEscrowClosed({ txHash, contractId, fn, seller, trade
       `El escrow on-chain no está ${expected === 'released' ? 'liberado' : 'reembolsado'} (estado: ${escrow?.status ?? 'inexistente'})`
     );
   }
+  return invocation;
 }

@@ -122,6 +122,26 @@ describeIntegration('trades', (ctx) => {
     ).toBe('refunded');
   });
 
+  it('blocks the seller refund of a disputed trade until the contract timeout (audit I1)', async () => {
+    const offer = await createSellOffer(seller.agent, { usdc: 5, price: 1 });
+    const t = (await buyer.agent.post('/api/trades').send({ offerId: offer.id, usdcAmount: 2 }).expect(201)).body.trade;
+    const funded = (await seller.agent.post(`/api/trades/${t.id}/fund`).send({ txHash: fakeHash() }).expect(200)).body
+      .trade;
+    expect(funded.fundedAt).toBeTruthy();
+    await buyer.agent.post(`/api/trades/${t.id}/paid`).expect(200);
+    await buyer.agent.post(`/api/trades/${t.id}/dispute`).expect(200);
+
+    const early = await seller.agent.post(`/api/trades/${t.id}/refund`).send({ txHash: fakeHash() }).expect(409);
+    expect(early.body.error).toMatch(/plazo del contrato/);
+    expect((await seller.agent.get(`/api/trades/${t.id}`).expect(200)).body.trade.status).toBe('disputed');
+
+    // Vencido el plazo (~24 h desde el depósito) el vendedor ya puede reembolsarse, como on-chain.
+    await ctx.pool.query("UPDATE trades SET funded_at = now() - interval '25 hours' WHERE id = $1", [t.id]);
+    const late = await seller.agent.post(`/api/trades/${t.id}/refund`).send({ txHash: fakeHash() }).expect(200);
+    expect(late.body.trade.status).toBe('refunded');
+    expect(await available(offer.id)).toBe(5);
+  });
+
   it("hides other users' trades and filters by status", async () => {
     const list = (await buyer.agent.get('/api/trades').expect(200)).body.trades;
     expect(list.length).toBeGreaterThan(0);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import FormField from '../common/FormField.jsx';
 import Button from '../common/Button.jsx';
@@ -21,6 +21,13 @@ export default function TakeOfferDialog({ offer, user, onConfirm, onClose }) {
   const value = Number(amount);
   const fiat = Number.isFinite(value) ? value * offer.price : 0;
   const needsAddress = userBuys && !user.stellarAddress;
+
+  // Escape cierra el diálogo (patrón de diálogo modal accesible).
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   const onSubmit = async (e) => {
     e.preventDefault();

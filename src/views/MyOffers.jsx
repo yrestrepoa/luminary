@@ -141,7 +141,7 @@ function HistoryTab() {
   return (
     <>
       <div className="mb-4">
-        <Tabs items={TRADE_FILTERS} value={status} onChange={setStatus} />
+        <Tabs items={TRADE_FILTERS} value={status} onChange={setStatus} label="Estado de la operación" />
       </div>
       <ErrorBanner>{error?.message}</ErrorBanner>
       {loading ? (
@@ -176,7 +176,12 @@ export default function MyOffers() {
         }
       />
       <div className="mb-6">
-        <Tabs items={TABS} value={tab} onChange={(key) => setParams(key === 'history' ? { tab: key } : {})} />
+        <Tabs
+          items={TABS}
+          value={tab}
+          onChange={(key) => setParams(key === 'history' ? { tab: key } : {})}
+          label="Sección"
+        />
       </div>
       {tab === 'offers' ? <OffersTab /> : <HistoryTab />}
     </>

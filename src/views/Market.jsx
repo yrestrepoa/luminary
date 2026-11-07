@@ -86,7 +86,7 @@ export default function Market() {
       <section>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-semibold">Ofertas disponibles</h2>
-          <Tabs items={OFFER_FILTERS} value={filter} onChange={setFilter} />
+          <Tabs items={OFFER_FILTERS} value={filter} onChange={setFilter} label="Tipo de oferta" />
         </div>
 
         {loading ? (

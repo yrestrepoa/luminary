@@ -106,6 +106,7 @@ export default function CreateOffer() {
                   <button
                     key={t.key}
                     type="button"
+                    aria-pressed={form.type === t.key}
                     onClick={() => set('type', t.key)}
                     className={`rounded-xl border py-2.5 text-sm font-semibold transition ${form.type === t.key ? t.active : 'border-white/10 text-slate-400 hover:text-slate-200'}`}
                   >

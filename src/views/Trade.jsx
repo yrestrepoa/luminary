@@ -538,6 +538,9 @@ export default function Trade() {
                         value={manualHash}
                         onChange={(e) => setManualHash(e.target.value)}
                         placeholder="Hash de la transacción (64 hex)"
+                        aria-label="Hash de la transacción (64 caracteres hexadecimales)"
+                        autoComplete="off"
+                        spellCheck={false}
                         pattern="[a-fA-F0-9]{64}"
                         required
                         className={`${INPUT_CLASS} font-mono text-xs`}

@@ -1,0 +1,103 @@
+# Luminary: API (+ SPA) + PostgreSQL + Redis.
+#
+#   cp .env.example .env        # rellena la sección "Docker Compose" y JWT_SECRET
+#   docker compose up -d --build
+#   curl http://127.0.0.1:${API_PORT:-8080}/api/health
+#
+# Secretos solo en .env (no versionado). Los servicios de datos no publican puertos.
+# Ver docs/PRODUCTION.md (TLS / proxy inverso, backups, persistencia de Redis).
+name: luminary
+
+x-common: &common
+  restart: unless-stopped
+  # Docker instalado como snap (AppArmor) no puede ejecutar entrypoints con esta opción:
+  # allí usa NO_NEW_PRIVILEGES=false. En Docker Engine estándar déjala en true.
+  security_opt: ['no-new-privileges:${NO_NEW_PRIVILEGES:-true}']
+  logging:
+    driver: json-file
+    options: { max-size: '10m', max-file: '5' }
+
+services:
+  postgres:
+    <<: *common
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-luminary}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-luminary}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    stop_grace_period: 30s
+
+  redis:
+    <<: *common
+    image: redis:7-alpine
+    # AOF (fsync cada segundo) + snapshots: los contadores de rate limit y los tokens
+    # revocados sobreviven a reinicios. Contraseña obligatoria.
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --appendfsync everysec --save 900 1 --save 300 100 --requirepass "$$REDIS_PASSWORD"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?define REDIS_PASSWORD en .env}
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Migraciones (schema_migrations): se ejecuta y termina antes de arrancar la API.
+  migrate:
+    image: luminary-api:${LUMINARY_TAG:-local}
+    command: ['node', 'server/db/migrate.js']
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-luminary}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-luminary}
+      LOG_LEVEL: warn
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: 'no'
+    security_opt: ['no-new-privileges:${NO_NEW_PRIVILEGES:-true}']
+    read_only: true
+
+  api:
+    <<: *common
+    build:
+      context: .
+      args:
+        VITE_STELLAR_NETWORK: ${VITE_STELLAR_NETWORK:-testnet}
+    image: luminary-api:${LUMINARY_TAG:-local}
+    env_file: .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      HOST: 0.0.0.0
+      PORT: 4000
+      STATIC_DIR: /app/dist
+      DATABASE_URL: postgres://${POSTGRES_USER:-luminary}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-luminary}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8080}
+      # Detrás de un proxy inverso en la red de Docker usa p.ej. TRUST_PROXY=uniquelocal o su IP.
+      TRUST_PROXY: ${TRUST_PROXY:-loopback}
+      VERIFY_STELLAR_TX: ${VERIFY_STELLAR_TX:-true}
+    ports:
+      # Solo loopback: publica hacia Internet a través del proxy TLS, no directamente.
+      - '127.0.0.1:${API_PORT:-8080}:4000'
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    read_only: true
+    tmpfs: ['/tmp']
+    cap_drop: ['ALL']
+    stop_grace_period: 20s
+
+volumes:
+  pgdata:
+  redisdata:

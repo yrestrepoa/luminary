@@ -1,0 +1,22 @@
+# Solo lo necesario para construir la imagen (ver Dockerfile).
+**/node_modules
+dist
+coverage
+.git
+.github
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.log
+**/.DS_Store
+contract-luminary
+docs
+server/test
+server/scripts
+**/*.test.js
+**/*.test.jsx
+src/test
+Dockerfile
+docker-compose*.yml
+.dockerignore

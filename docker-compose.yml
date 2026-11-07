@@ -38,11 +38,11 @@ services:
     <<: *common
     image: redis:7-alpine
     # AOF (fsync cada segundo) + snapshots: los contadores de rate limit y los tokens
-    # revocados sobreviven a reinicios. Contraseña obligatoria.
+    # revocados sobreviven a reinicios. noeviction: nunca descartar revocaciones. Contraseña obligatoria.
     command:
       - sh
       - -c
-      - exec redis-server --appendonly yes --appendfsync everysec --save 900 1 --save 300 100 --requirepass "$$REDIS_PASSWORD"
+      - exec redis-server --appendonly yes --appendfsync everysec --save 900 1 --save 300 100 --maxmemory-policy noeviction --requirepass "$$REDIS_PASSWORD"
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?define REDIS_PASSWORD en .env}
       REDISCLI_AUTH: ${REDIS_PASSWORD}

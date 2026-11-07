@@ -60,17 +60,18 @@ function originPolicy() {
 const internalError = (req) => ({ error: 'Error interno del servidor', requestId: req.id });
 
 /**
- * Crea la app Express. `logger` permite inyectar uno en tests.
- * @param {{ logger?: import('pino').Logger }} [opts]
+ * Crea la app Express. `logger` y `trustProxy` permiten inyectarlos en tests.
+ * @param {{ logger?: import('pino').Logger, trustProxy?: boolean | number | string[] }} [opts]
  */
-export function createApp({ logger = defaultLogger } = {}) {
+export function createApp({ logger = defaultLogger, trustProxy = config.trustProxy } = {}) {
   assertServerConfig(config);
 
   const app = express();
   app.disable('x-powered-by');
-  // Saltos de proxy de confianza para req.ip / req.protocol (rate limit por IP real).
-  // Ver TRUST_PROXY en docs/PRODUCTION.md. Por defecto solo loopback (Vite / proxy local).
-  app.set('trust proxy', config.trustProxy);
+  // Proxies de confianza para req.ip / req.protocol (el rate limit por IP usa req.ip). Valor
+  // validado en config.js: nunca `true`. Por defecto `false` en producción (X-Forwarded-For
+  // ignorado) y 'loopback' en desarrollo. Contrato del proxy: docs/PRODUCTION.md → Reverse proxy.
+  app.set('trust proxy', trustProxy);
 
   app.use(httpLogger(logger));
   app.use(

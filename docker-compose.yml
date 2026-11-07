@@ -83,8 +83,9 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-luminary}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-luminary}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8080}
-      # Detrás de un proxy inverso en la red de Docker usa p.ej. TRUST_PROXY=uniquelocal o su IP.
-      TRUST_PROXY: ${TRUST_PROXY:-loopback}
+      # Un salto de proxy: el proxy inverso del host (TLS) delante del puerto publicado en 127.0.0.1.
+      # Ese proxy DEBE sobrescribir X-Forwarded-For (nginx: $remote_addr). Ver docs/PRODUCTION.md.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
       VERIFY_STELLAR_TX: ${VERIFY_STELLAR_TX:-true}
     ports:
       # Solo loopback: publica hacia Internet a través del proxy TLS, no directamente.

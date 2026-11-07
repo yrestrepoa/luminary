@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
@@ -18,14 +19,41 @@ const limiterOpts = {
   legacyHeaders: false,
   message: { error: 'Demasiados intentos. Intenta de nuevo en unos minutos.' },
 };
+export const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+export const LOGIN_LIMIT_PER_IP = 10;
+export const LOGIN_LIMIT_PER_ACCOUNT = 10;
+
+/**
+ * Clave del limitador por cuenta: SHA-256 del email normalizado (minúsculas, sin espacios), para
+ * no guardar emails en claro en Redis. Sin email (cuerpo inválido) → null y no cuenta.
+ */
+export function accountKey(body) {
+  const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+  if (!email || email.length > 255) return null;
+  return createHash('sha256').update(email).digest('hex');
+}
+
 // Contadores en Redis (compartidos entre procesos) o en memoria si no hay REDIS_URL.
-// 10 intentos fallidos de login por IP cada 15 min (los exitosos no cuentan).
-const loginLimiter = rateLimit({
+// Login: dos límites independientes sobre intentos FALLIDOS (los exitosos no cuentan):
+//  - por IP (req.ip, que depende de TRUST_PROXY): frena a un atacante probando muchas cuentas;
+//  - por cuenta (email): frena la fuerza bruta contra UNA cuenta aunque el atacante rote IPs
+//    (o falsee X-Forwarded-For). Contrapartida: un atacante puede bloquear el login de una
+//    cuenta concreta durante la ventana; se acepta frente al riesgo de adivinar la contraseña.
+const loginIpLimiter = rateLimit({
   ...limiterOpts,
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
+  windowMs: LOGIN_WINDOW_MS,
+  limit: LOGIN_LIMIT_PER_IP,
   skipSuccessfulRequests: true,
   store: new CacheRateLimitStore('rl:login:'),
+});
+const loginAccountLimiter = rateLimit({
+  ...limiterOpts,
+  windowMs: LOGIN_WINDOW_MS,
+  limit: LOGIN_LIMIT_PER_ACCOUNT,
+  skipSuccessfulRequests: true,
+  skip: (req) => accountKey(req.body) === null,
+  keyGenerator: (req) => accountKey(req.body),
+  store: new CacheRateLimitStore('rl:login-account:'),
 });
 const registerLimiter = rateLimit({
   ...limiterOpts,
@@ -61,7 +89,7 @@ router.post('/register', registerLimiter, async (req, res) => {
   res.status(201).json({ user: toUser(user) });
 });
 
-router.post('/login', loginLimiter, async (req, res) => {
+router.post('/login', loginIpLimiter, loginAccountLimiter, async (req, res) => {
   const { email, password } = validate(req.body)
     .email('email')
     .string('password', { min: 1, max: 72, trim: false })

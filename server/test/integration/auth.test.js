@@ -95,10 +95,11 @@ describeIntegration('auth', (ctx) => {
   it('rate-limits failed logins per client IP (10 per 15 min); successful logins do not count', async () => {
     const { email, password } = await registerUser(ctx.app, { address: false });
     // Desde loopback (proxy de confianza por defecto) se respeta X-Forwarded-For: cada "cliente" tiene su cupo.
-    const login = (ip, pw) =>
-      request(ctx.app).post('/api/auth/login').set('X-Forwarded-For', ip).send({ email, password: pw });
+    const login = (ip, pw, as = email) =>
+      request(ctx.app).post('/api/auth/login').set('X-Forwarded-For', ip).send({ email: as, password: pw });
     for (let i = 0; i < 3; i++) await login('203.0.113.7', password).expect(200);
-    for (let i = 0; i < 10; i++) await login('203.0.113.7', 'nope-nope').expect(401);
+    // Fallos contra cuentas distintas: solo cuenta el límite por IP (el de cuenta se prueba en rate-limit.test.js).
+    for (let i = 0; i < 10; i++) await login('203.0.113.7', 'nope-nope', `ghost${i}@example.com`).expect(401);
     const limited = await login('203.0.113.7', password).expect(429);
     expect(limited.body.error).toMatch(/Demasiados intentos/);
     expect(limited.headers.ratelimit).toBeDefined();

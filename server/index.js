@@ -22,6 +22,13 @@ const { createApp } = await import('./app.js');
 const { pool } = await import('./db/pool.js');
 const { cache } = await import('./cache/index.js');
 
+if (config.isProd && !config.trustProxyExplicit) {
+  logger.warn(
+    'TRUST_PROXY no definido: X-Forwarded-For se ignora y el rate limit por IP usa la IP del socket. ' +
+      'Detrás de un proxy inverso fija TRUST_PROXY (p.ej. 1) — ver docs/PRODUCTION.md.'
+  );
+}
+
 // Con REDIS_URL: intenta conectar (timeout corto). Si Redis no está, la API arranca igual
 // pero las rutas que dependen de él responden 503 hasta que reconecte (fail-closed).
 await cache.init();

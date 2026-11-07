@@ -166,13 +166,34 @@ describe('parseTrustProxy', () => {
     [undefined, 'loopback'],
     ['', 'loopback'],
     ['false', false],
+    ['0', false],
     ['1', 1],
+    ['2', 2],
     ['loopback, 10.0.0.0/8', ['loopback', '10.0.0.0/8']],
+    ['uniquelocal', ['uniquelocal']],
+    ['172.18.0.1', ['172.18.0.1']],
+    ['fd00::/8, 192.168.1.10', ['fd00::/8', '192.168.1.10']],
   ])('%s → %j', (raw, value) => {
     expect(parseTrustProxy(raw)).toEqual({ value });
+  });
+
+  it('does not trust any proxy by default in production', () => {
+    expect(parseTrustProxy(undefined, { isProd: true })).toEqual({ value: false });
+    expect(parseTrustProxy('  ', { isProd: true })).toEqual({ value: false });
+    expect(parseTrustProxy('1', { isProd: true })).toEqual({ value: 1 });
+    expect(loadConfig(prodEnv())).toMatchObject({ trustProxy: false, trustProxyExplicit: false });
+    expect(loadConfig(prodEnv({ TRUST_PROXY: '1' }))).toMatchObject({ trustProxy: 1, trustProxyExplicit: true });
   });
 
   it('rejects trusting every proxy', () => {
     expect(parseTrustProxy('true').error).toMatch(/TRUST_PROXY=true/);
   });
+
+  it.each(['yes', '11', '-1', '10.0.0.0/33', '300.1.1.1', 'loopback,foo', 'fd00::/129', '1.2.3.4/8/1', ','])(
+    'rejects %j',
+    (raw) => {
+      expect(parseTrustProxy(raw).error).toMatch(/TRUST_PROXY/);
+      expect(() => loadConfig({ TRUST_PROXY: raw })).toThrow(ConfigError);
+    }
+  );
 });

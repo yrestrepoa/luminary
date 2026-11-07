@@ -2,6 +2,7 @@
 //
 // loadConfig() es pura (recibe el entorno) para poder probarla; `config` es la instancia
 // usada por la app. Si algo es inválido se lanza ConfigError con TODOS los problemas a la vez.
+import { isIP } from 'node:net';
 import dotenv from 'dotenv';
 import { Asset, Networks, StrKey } from '@stellar/stellar-sdk';
 
@@ -54,25 +55,52 @@ export function jwtSecretProblems(secret) {
   return out;
 }
 
+const TRUST_PROXY_NAMED = ['loopback', 'linklocal', 'uniquelocal'];
+export const MAX_TRUST_PROXY_HOPS = 10;
+
+/** true si `s` es una IP (v4/v6) o una subred CIDR válida. */
+function isIpOrCidr(s) {
+  const [ip, prefix, ...rest] = s.split('/');
+  const family = isIP(ip);
+  if (!family || rest.length) return false;
+  if (prefix === undefined) return true;
+  if (!/^\d{1,3}$/.test(prefix)) return false;
+  return Number(prefix) <= (family === 4 ? 32 : 128);
+}
+
 /**
- * TRUST_PROXY → valor de `app.set('trust proxy')`. Acepta: false | número de saltos |
- * lista separada por comas de IPs/subredes o 'loopback' | 'linklocal' | 'uniquelocal'.
- * 'true' (confiar en cualquiera) se rechaza: permitiría falsear X-Forwarded-For y saltarse el rate limit.
+ * TRUST_PROXY → valor de `app.set('trust proxy')`, validado. Acepta:
+ *  - `false` / `0`: no confiar en X-Forwarded-For (req.ip = IP del socket);
+ *  - número de saltos (1…10): proxies delante de la API (p.ej. `1` = un proxy inverso);
+ *  - lista separada por comas de IPs, subredes CIDR o 'loopback' | 'linklocal' | 'uniquelocal'.
+ * 'true' (confiar en cualquiera) y valores no reconocidos se rechazan: permitirían falsear
+ * X-Forwarded-For y saltarse el rate limit por IP.
+ * Por defecto: `false` en producción (hay que declarar el proxy explícitamente) y 'loopback' en desarrollo.
  */
-export function parseTrustProxy(raw) {
+export function parseTrustProxy(raw, { isProd = false } = {}) {
   const v = (raw ?? '').trim();
-  if (v === '') return { value: 'loopback' };
-  if (v === 'false') return { value: false };
+  if (v === '') return { value: isProd ? false : 'loopback' };
+  if (v === 'false' || v === '0') return { value: false };
   if (v === 'true') {
     return { error: 'TRUST_PROXY=true confía en cualquier X-Forwarded-For (rate limit evitable); indica saltos o IPs' };
   }
-  if (/^\d+$/.test(v)) return { value: Number(v) };
-  return {
-    value: v
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
-  };
+  if (/^\d+$/.test(v)) {
+    const hops = Number(v);
+    if (hops > MAX_TRUST_PROXY_HOPS)
+      return { error: `TRUST_PROXY: como mucho ${MAX_TRUST_PROXY_HOPS} saltos de proxy` };
+    return { value: hops };
+  }
+  const items = v
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const invalid = items.filter((s) => !TRUST_PROXY_NAMED.includes(s) && !isIpOrCidr(s));
+  if (!items.length || invalid.length) {
+    return {
+      error: `TRUST_PROXY: valor no válido (${invalid.join(', ') || v}); usa false, un número de saltos, IPs/CIDR o ${TRUST_PROXY_NAMED.join(' | ')}`,
+    };
+  }
+  return { value: items };
 }
 
 /** Lista de orígenes `scheme://host[:port]` separada por comas. */
@@ -126,7 +154,7 @@ export function loadConfig(env = process.env) {
   const logLevel = env.LOG_LEVEL || (nodeEnv === 'test' ? 'silent' : 'info');
   if (!LOG_LEVELS.includes(logLevel)) problems.push(`LOG_LEVEL debe ser uno de: ${LOG_LEVELS.join(', ')}`);
 
-  const trustProxy = parseTrustProxy(env.TRUST_PROXY);
+  const trustProxy = parseTrustProxy(env.TRUST_PROXY, { isProd });
   if (trustProxy.error) problems.push(trustProxy.error);
 
   const databaseUrl = env.DATABASE_URL || undefined;
@@ -178,6 +206,7 @@ export function loadConfig(env = process.env) {
     port: int(env, 'PORT', 4000, { min: 0, max: 65535 }, problems),
     logLevel,
     trustProxy: trustProxy.value,
+    trustProxyExplicit: Boolean(env.TRUST_PROXY?.trim()),
     // Origen público de la SPA (p.ej. https://luminary.example). Las peticiones con Origin
     // distinto del propio host, PUBLIC_ORIGIN o CORS_ORIGINS se rechazan en métodos mutantes.
     publicOrigin: publicOrigin ?? null,

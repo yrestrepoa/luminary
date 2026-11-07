@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { config } from '../config.js';
+import { logger } from '../logger.js';
 
 // int8 (BIGINT ids, COUNT(*)) → number. Los ids caben de sobra en 2^53.
 pg.types.setTypeParser(pg.types.builtins.INT8, (v) => Number(v));
@@ -9,17 +10,27 @@ pg.types.setTypeParser(pg.types.builtins.INT8, (v) => Number(v));
  * Pool compartido. Usar SIEMPRE consultas parametrizadas ($1, $2…),
  * nunca interpolar valores en el SQL.
  */
-export const pool = new pg.Pool({
-  connectionString: config.databaseUrl,
-  max: 10,
-  idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 5_000,
-});
+export function createPool(db = config.db, connectionString = config.databaseUrl) {
+  const p = new pg.Pool({
+    connectionString,
+    max: db.max,
+    idleTimeoutMillis: db.idleTimeoutMs,
+    connectionTimeoutMillis: db.connectionTimeoutMs,
+    // Corta en el servidor consultas colgadas (y libera locks); 0 = sin límite.
+    statement_timeout: db.statementTimeoutMs || undefined,
+    // Transacciones abiertas sin actividad (cliente colgado) no retienen locks indefinidamente.
+    idle_in_transaction_session_timeout: db.statementTimeoutMs ? db.statementTimeoutMs * 3 : undefined,
+    application_name: 'luminary-api',
+    keepAlive: true,
+  });
+  p.on('error', (err) => {
+    // Errores de clientes inactivos (p.ej. el servidor cerró la conexión): no tumbar el proceso.
+    logger.error({ err }, '[pg] error en cliente inactivo');
+  });
+  return p;
+}
 
-pool.on('error', (err) => {
-  // Errores de clientes inactivos (p.ej. el servidor cerró la conexión): no tumbar el proceso.
-  console.error('[pg] error en cliente inactivo:', err.message);
-});
+export const pool = createPool();
 
 /** Atajo: devuelve la primera fila o null. */
 export async function one(sql, params, db = pool) {

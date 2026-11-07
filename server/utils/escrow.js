@@ -14,6 +14,7 @@ import {
   scValToNative,
 } from '@stellar/stellar-sdk';
 import { config } from '../config.js';
+import { logger } from '../logger.js';
 import { HttpError, badRequest } from './http.js';
 import { toStroops } from './stellar.js';
 
@@ -30,7 +31,7 @@ function rpcServer() {
 }
 
 const unavailable = (err) => {
-  console.error('[escrow] Soroban RPC:', err?.message ?? err);
+  logger.error({ err }, '[escrow] Soroban RPC error');
   return new HttpError(502, 'No se pudo consultar Soroban RPC; intenta de nuevo');
 };
 

@@ -9,6 +9,7 @@
 // lanza CacheUnavailableError → la API responde 503 (fail-closed).
 import { createClient } from 'redis';
 import { config } from '../config.js';
+import { logger } from '../logger.js';
 
 const KEY_PREFIX = 'luminary:';
 const CONNECT_TIMEOUT_MS = 2_000;
@@ -135,10 +136,10 @@ class RedisBackend {
       // Una línea cada 30 s como mucho, para no inundar el log mientras Redis está caído.
       if (Date.now() - this.#lastErrorLog > 30_000) {
         this.#lastErrorLog = Date.now();
-        console.error(`[cache] Redis error: ${err.message}`);
+        logger.error({ err }, '[cache] Redis error');
       }
     });
-    this.client.on('ready', () => console.log('[cache] Redis conectado'));
+    this.client.on('ready', () => logger.info('[cache] Redis conectado'));
   }
 
   /** Conecta con timeout. Si falla, el cliente sigue reintentando en segundo plano. */
@@ -155,8 +156,9 @@ class RedisBackend {
       ]);
       return true;
     } catch (err) {
-      console.error(
-        `[cache] No se pudo conectar a Redis (${err.message}); se reintentará. Rutas de sesión/login → 503 hasta entonces.`
+      logger.error(
+        { err },
+        '[cache] No se pudo conectar a Redis; se reintentará. Rutas de sesión/login → 503 hasta entonces.'
       );
       return false;
     } finally {
@@ -239,14 +241,14 @@ export function createCache(url = config.redisUrl) {
     },
     async init() {
       if (backend.kind === 'redis') {
-        console.log(`[cache] Usando Redis (${redactUrl(url)})`);
+        logger.info({ redis: redactUrl(url) }, '[cache] Usando Redis');
         await backend.connect();
       } else {
-        console.warn(
+        logger.warn(
           '[cache] REDIS_URL no definido: rate limit y revocación de tokens en MEMORIA del proceso ' +
             '(no se comparten entre procesos ni sobreviven a reinicios). Usa Redis en producción.'
         );
-        console.warn(
+        logger.warn(
           '[cache] ⚠ Un logout solo invalida el token en ESTE proceso; tras reiniciar, los tokens revocados vuelven a ser válidos hasta expirar.'
         );
       }

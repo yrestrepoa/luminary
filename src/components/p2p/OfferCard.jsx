@@ -4,20 +4,22 @@ import { fmtFiat } from '../../utils/format.js';
  * offer: import('../../types/index.js').Offer
  * type 'sell' = el comerciante vende USDC (el usuario compra).
  */
-export default function OfferCard({ offer, onAction, disabled }) {
+export default function OfferCard({ offer, onAction, disabled, actionLabel }) {
   const userBuys = offer.type === 'sell';
+  const merchant = offer.merchant ?? 'Usuario';
 
   return (
     <article className="group flex flex-col gap-4 rounded-2xl border border-white/5 bg-slate-900/60 p-5 transition hover:border-amber-300/30 hover:bg-slate-900">
       <header className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-800 text-sm font-semibold text-amber-200">
-            {offer.merchant.slice(0, 2).toUpperCase()}
+            {merchant.slice(0, 2).toUpperCase()}
           </div>
           <div>
-            <p className="font-medium">{offer.merchant}</p>
+            <p className="font-medium">{merchant}</p>
             <p className="text-xs text-slate-400">
-              ★ {offer.rating.toFixed(1)} · {offer.trades} operaciones
+              {offer.rating != null && <>★ {offer.rating.toFixed(1)} · </>}
+              {offer.trades} operaciones{offer.demo && ' · demo'}
             </p>
           </div>
         </div>
@@ -50,12 +52,14 @@ export default function OfferCard({ offer, onAction, disabled }) {
         </div>
         <div>
           <dt className="text-xs text-slate-500">Banco</dt>
-          <dd className="font-medium">{offer.bank}</dd>
+          <dd className="font-medium">{offer.bank || '—'}</dd>
         </div>
         <div className="col-span-2">
           <dt className="text-xs text-slate-500">Límites</dt>
           <dd className="tabular-nums">
-            {fmtFiat(offer.min, offer.currency)} – {fmtFiat(offer.max, offer.currency)}
+            {offer.min == null && offer.max == null
+              ? 'Sin límites'
+              : `${offer.min != null ? fmtFiat(offer.min, offer.currency) : '—'} – ${offer.max != null ? fmtFiat(offer.max, offer.currency) : '—'}`}
           </dd>
         </div>
       </dl>
@@ -69,7 +73,7 @@ export default function OfferCard({ offer, onAction, disabled }) {
             : 'bg-rose-400 text-slate-950 hover:bg-rose-300'
         }`}
       >
-        {userBuys ? 'Comprar USDC' : 'Vender USDC'}
+        {actionLabel ?? (userBuys ? 'Comprar USDC' : 'Vender USDC')}
       </button>
     </article>
   );

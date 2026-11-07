@@ -1,0 +1,17 @@
+/** Selector segmentado. items: [{ key, label }] */
+export default function Tabs({ items, value, onChange }) {
+  return (
+    <div className="flex flex-wrap rounded-xl border border-white/5 bg-slate-900/60 p-1 text-sm">
+      {items.map((t) => (
+        <button
+          key={t.key}
+          type="button"
+          onClick={() => onChange(t.key)}
+          className={`rounded-lg px-3 py-1.5 transition ${value === t.key ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}

@@ -160,11 +160,11 @@ export function createApp({ logger = defaultLogger } = {}) {
     }
     if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'JSON inválido' });
     if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Cuerpo demasiado grande' });
+    if (err.status === 404 && err.code === 'ENOENT') return res.status(404).end(); // asset inexistente
     // Otros errores 4xx de body-parser/express (p.ej. charset no soportado, petición abortada).
     if (err.expose && err.status >= 400 && err.status < 500) {
       return res.status(err.status).json({ error: 'Petición inválida' });
     }
-    if (err.status === 404 && err.code === 'ENOENT') return res.status(404).end(); // asset inexistente
     req.log.error({ err }, 'unhandled error');
     res.status(500).json(internalError(req));
   });

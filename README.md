@@ -144,6 +144,7 @@ All routes are under `/api`. Mutations must send `Content-Type: application/json
 | POST | `/auth/logout` | – | Revokes the current JWT (`jti`) on the server and clears the cookie |
 | GET | `/auth/me` | ✔ | Current user |
 | PATCH | `/users/me` | ✔ | `{ displayName?, stellarAddress? }` (`null` unlinks the address) |
+| DELETE | `/users/me` | ✔ | `{ password }` → deletes my account (204). `409` while I have open trades. See [Account deletion](#account-deletion) |
 | GET | `/offers` | – | Active offers. Query: `type=buy\|sell`, `currency`, `limit` |
 | GET | `/offers/mine` | ✔ | My offers, any status |
 | GET | `/offers/:id` | – | Offer detail |
@@ -161,6 +162,15 @@ All routes are under `/api`. Mutations must send `Content-Type: application/json
 | POST | `/trades/:id/dispute` | ✔ party | Open a dispute after payment (resolved manually for now) |
 
 Offer `type: "sell"` means the creator sells USDC.
+
+### Account deletion
+
+`DELETE /api/users/me` with `{ password }` (the current password is required again; 5 wrong attempts per account per 15 min, then `429`).
+
+- **Open trades block deletion.** If the account is buyer or seller in any `pending`, `funded`, `paid` or `disputed` trade, the API answers `409` and changes nothing. Cancel the `pending` trades and release or refund the funded ones first: USDC in escrow can't be left behind.
+- **No trades ever:** the user row is deleted, and its offers with it.
+- **Only closed trades** (`released`, `refunded`, `cancelled`): the counterparty keeps its trade history, so the row is **anonymized** instead (email `deleted-<id>@deleted.invalid`, name `Cuenta eliminada`, unusable password, Stellar address unlinked, `deleted_at` set). The user's offers are closed. The email and Stellar address can be used again by a new account. On-chain data (escrows, payments) is public and can't be erased.
+- **Sessions:** the current JWT is revoked and the cookie cleared. Any other session of the account stops working at once, because sessions and logins ignore deleted or anonymized rows.
 
 ## Trade flow (on-chain escrow)
 

@@ -79,6 +79,12 @@ export function createApp({ logger = defaultLogger, trustProxy = config.trustPro
       contentSecurityPolicy: {
         directives: {
           'connect-src': ["'self'", ...connectSources()],
+          // Fuentes autoalojadas (@fontsource, empaquetadas por Vite en /assets) y CSS solo
+          // desde ficheros propios: sin Google Fonts (filtraba la IP de cada visitante), sin
+          // `https:` genérico y sin 'unsafe-inline' (la SPA no usa estilos en línea). Si algún día
+          // hace falta un atributo style, mejor una clase de Tailwind que relajar esta directiva.
+          'style-src': ["'self'"],
+          'font-src': ["'self'"],
           // Sin upgrade-insecure-requests fuera de producción (permite probar por http://).
           'upgrade-insecure-requests': config.isProd ? [] : null,
         },

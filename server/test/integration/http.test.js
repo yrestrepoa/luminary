@@ -44,6 +44,16 @@ describeIntegration('HTTP layer', (ctx) => {
     expect(res.headers['x-content-type-options']).toBe('nosniff');
     expect(res.headers['content-security-policy']).toContain("default-src 'self'");
     expect(res.headers['content-security-policy']).toContain('connect-src');
+    // Fuentes y CSS solo propios: sin Google Fonts, sin `https:` genérico ni 'unsafe-inline'.
+    const directives = Object.fromEntries(
+      res.headers['content-security-policy'].split(';').map((d) => {
+        const [name, ...values] = d.trim().split(/\s+/);
+        return [name, values.join(' ')];
+      })
+    );
+    expect(directives['style-src']).toBe("'self'");
+    expect(directives['font-src']).toBe("'self'");
+    expect(res.headers['content-security-policy']).not.toMatch(/googleapis|gstatic|unsafe-inline/);
     const echoed = await request(ctx.app).get('/api/health/live').set('X-Request-Id', 'edge-abc-1');
     expect(echoed.headers['x-request-id']).toBe('edge-abc-1');
   });

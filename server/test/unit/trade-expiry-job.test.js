@@ -64,7 +64,7 @@ describe('defaultFundedOnChain', () => {
   const verifyTx = config.stellar.verifyTx;
   const simulatedContract = (simulateTransaction) => {
     const [tx] = simulateTransaction.mock.calls[0];
-    return Address.fromScAddress(tx.operations[0].func.invokeContract().contractAddress()).toString();
+    return Address.fromScAddress(tx.operations[0].func.invokeContract.contractAddress).toString();
   };
 
   afterEach(() => {

@@ -9,6 +9,7 @@
     "node": ">=22.12"
   },
   "scripts": {
+    "predev": "node server/scripts/check-env.js",
     "dev": "concurrently -k -n api,web -c cyan,magenta \"npm:server:dev\" \"npm:dev:web\"",
     "dev:web": "vite",
     "server": "node server/index.js",

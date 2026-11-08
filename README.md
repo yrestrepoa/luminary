@@ -91,6 +91,8 @@ npm run dev          # API on :4000 + Vite on :5173 (/api is proxied to the API)
 
 Open http://localhost:5173. If the API is not running, the market falls back to demo offers.
 
+`npm run dev` first validates the API config (`predev` → `server/scripts/check-env.js`) and stops with the list of problems if `.env` is missing or `JWT_SECRET` is absent, weak or still the `.env.example` placeholder. If Vite logs `http proxy error: /api/... connect ECONNREFUSED 127.0.0.1:4000`, the API is not listening: check the `[api]` lines for a `fatal` config error.
+
 ### Scripts
 
 | Script | What it does |

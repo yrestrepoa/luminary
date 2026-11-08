@@ -92,9 +92,10 @@
  * @property {string} id
  * @property {string} hash           hash de la transacción
  * @property {string} kind           tipo de operación de Horizon (payment, create_account…)
- * @property {string} amount
- * @property {string} asset          'XLM' o código del activo (p. ej. 'USDC')
- * @property {string} counterparty   la otra cuenta del pago
+ * @property {string} [contractFn]   método invocado si kind = 'invoke_host_function' (create, release, refund…)
+ * @property {string|null} amount    null si una invocación de contrato no movió activos de la cuenta
+ * @property {string|null} asset     'XLM' o código del activo (p. ej. 'USDC')
+ * @property {string|null} counterparty  la otra cuenta (G…) o contrato (C…) del pago
  * @property {boolean} incoming      true si la cuenta recibió el pago
  * @property {string} createdAt      ISO 8601
  */

@@ -70,6 +70,28 @@ impl Setup<'_> {
             .ledger()
             .with_mut(|li| li.sequence_number += ledgers);
     }
+
+    /// Creates a 1-stroop escrow for `seller` (who must hold enough balance).
+    fn create_for(&self, seller: &Address, trade_id: u64) -> Escrow {
+        self.client
+            .create(seller, &self.buyer, &self.token.address, &1, &trade_id)
+    }
+
+    /// Asserts that the escrow of `(self.seller, trade_id)` and both of its order-index
+    /// entries (`EscrowOrder` and `Order(order_id)`) live for at least `TTL_THRESHOLD`.
+    fn assert_order_ttls(&self, trade_id: u64, order_id: u64) {
+        let keys = [
+            DataKey::Escrow(self.seller.clone(), trade_id),
+            DataKey::EscrowOrder(self.seller.clone(), trade_id),
+            DataKey::Order(order_id),
+        ];
+        for key in &keys {
+            let ttl = self.env.as_contract(&self.contract, || {
+                self.env.storage().persistent().get_ttl(key)
+            });
+            assert!(ttl >= TTL_THRESHOLD, "ttl {ttl} should cover ~30 days");
+        }
+    }
 }
 
 #[test]
@@ -162,6 +184,133 @@ fn order_listing_rejects_invalid_page_sizes() {
         s.client.try_list_orders(&1, &(MAX_ORDER_PAGE_SIZE + 1)),
         Err(Ok(Error::InvalidLimit))
     );
+}
+
+#[test]
+fn order_page_size_is_capped_at_25() {
+    let s = setup();
+    assert_eq!(MAX_ORDER_PAGE_SIZE, 25);
+    for trade_id in 0..26 {
+        s.create_for(&s.seller, trade_id);
+    }
+    assert_eq!(s.client.order_count(), 26);
+    assert_eq!(s.client.list_orders(&1, &25).len(), 25);
+    assert_eq!(s.client.list_orders(&26, &25).len(), 1);
+    assert_eq!(
+        s.client.try_list_orders(&1, &26),
+        Err(Ok(Error::InvalidLimit))
+    );
+    assert_eq!(
+        s.client.try_list_orders(&1, &0),
+        Err(Ok(Error::InvalidLimit))
+    );
+}
+
+#[test]
+fn order_pages_handle_start_and_partial_last_page() {
+    let s = setup();
+    for trade_id in 1..=3 {
+        s.create_for(&s.seller, trade_id);
+    }
+    assert_eq!(s.client.order_count(), 3);
+
+    // Indexes are 1-based: start 0 is rejected instead of silently aliasing start 1.
+    assert_eq!(
+        s.client.try_list_orders(&0, &1),
+        Err(Ok(Error::InvalidStart))
+    );
+
+    // Partial last page: slots 2..=11 requested, only 2..=3 exist.
+    let page = s.client.list_orders(&2, &10);
+    assert_eq!(page.len(), 2);
+    assert_eq!(page.get(0).unwrap().trade_id, 2);
+    assert_eq!(page.get(1).unwrap().trade_id, 3);
+
+    // Paging by `start + limit` visits every order exactly once.
+    assert_eq!(s.client.list_orders(&1, &2).len(), 2);
+    assert_eq!(s.client.list_orders(&3, &2).len(), 1);
+
+    // Past the end: an empty page, not an error.
+    assert_eq!(s.client.list_orders(&4, &10).len(), 0);
+    assert_eq!(s.client.list_orders(&u64::MAX, &10).len(), 0);
+}
+
+#[test]
+fn closed_orders_stay_listed_with_their_status() {
+    let s = setup();
+    s.create();
+    s.create_for(&s.seller, TRADE + 1);
+    s.client.release(&s.seller, &TRADE);
+    s.client.refund(&s.buyer, &s.seller, &(TRADE + 1));
+
+    assert_eq!(s.client.order_count(), 2);
+    let page = s.client.list_orders(&1, &MAX_ORDER_PAGE_SIZE);
+    assert_eq!(page.len(), 2);
+    assert_eq!(page.get(0).unwrap().status, Status::Released);
+    assert_eq!(page.get(1).unwrap().status, Status::Refunded);
+}
+
+#[test]
+fn orders_from_several_sellers_share_one_index() {
+    let s = setup();
+    let other_seller = Address::generate(&s.env);
+    StellarAssetClient::new(&s.env, &s.token.address).mint(&other_seller, &AMOUNT);
+    s.create_for(&s.seller, TRADE);
+    s.create_for(&other_seller, TRADE);
+    s.create_for(&s.seller, TRADE + 1);
+
+    let page = s.client.list_orders(&1, &MAX_ORDER_PAGE_SIZE);
+    assert_eq!(page.len(), 3);
+    assert_eq!(page.get(0).unwrap().seller, s.seller);
+    assert_eq!(page.get(1).unwrap().seller, other_seller);
+    assert_eq!(page.get(2).unwrap().seller, s.seller);
+    assert_eq!(page.get(2).unwrap().trade_id, TRADE + 1);
+}
+
+#[test]
+fn failed_create_does_not_advance_order_count() {
+    let s = setup();
+    assert_eq!(
+        s.client
+            .try_create(&s.seller, &s.buyer, &s.token.address, &0, &TRADE),
+        Err(Ok(Error::InvalidAmount))
+    );
+    assert_eq!(
+        s.client
+            .try_create(&s.seller, &s.seller, &s.token.address, &AMOUNT, &TRADE),
+        Err(Ok(Error::SameParty))
+    );
+    assert!(s
+        .client
+        .try_create(&s.seller, &s.buyer, &s.token.address, &(AMOUNT * 3), &TRADE)
+        .is_err());
+    assert_eq!(s.client.order_count(), 0);
+
+    s.create();
+    assert_eq!(
+        s.client
+            .try_create(&s.seller, &s.buyer, &s.token.address, &AMOUNT, &TRADE),
+        Err(Ok(Error::AlreadyExists))
+    );
+    assert_eq!(s.client.order_count(), 1);
+    assert_eq!(s.client.list_orders(&1, &MAX_ORDER_PAGE_SIZE).len(), 1);
+}
+
+#[test]
+fn order_index_ttl_is_extended_on_create_release_and_refund() {
+    let s = setup();
+    s.create();
+    s.create_for(&s.seller, TRADE + 1);
+    s.assert_order_ttls(TRADE, 1);
+    s.assert_order_ttls(TRADE + 1, 2);
+
+    // Two days later every TTL is below the threshold; release and refund must extend
+    // the escrow and both index entries again.
+    s.advance(2 * DAY_IN_LEDGERS);
+    s.client.release(&s.seller, &TRADE);
+    s.client.refund(&s.buyer, &s.seller, &(TRADE + 1));
+    s.assert_order_ttls(TRADE, 1);
+    s.assert_order_ttls(TRADE + 1, 2);
 }
 
 #[test]

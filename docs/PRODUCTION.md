@@ -311,7 +311,7 @@ browser error reporter (Sentry or similar) hooked into `ErrorBoundary`.
 
 ## Mainnet migration (escrow contract)
 
-The testnet contract `CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI` is for testing only.
+The testnet contracts (`CBWCY3KMNME5TKJTIRYNA3F32BJ6CG2UWIP7F6I6WYTK2HCAL23AWGKR`, and the previous `CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI`) are for testing only.
 
 1. **Audit.** Commission an independent audit of `contract-luminary/contracts/escrow` (auth on `create`/`release`/`refund`, timeout logic, token handling, storage TTL/archival and rent). Fix findings, tag the audited commit.
 2. **Decide the open design points first** (see [Known limits](#known-limits)): refund timeout length, dispute/arbitration model, whether an admin/pausing mechanism is wanted. Changing them later means a new contract.

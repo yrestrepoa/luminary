@@ -72,7 +72,7 @@ The API validates its environment at boot and exits with a list of every problem
 | `PORT` / `HOST` | API listen address (default `127.0.0.1:4000`). The Vite dev proxy reads `PORT`. |
 | `NODE_ENV` | `production` enables `Secure` cookies (requires HTTPS) and the production checks. |
 | `REDIS_URL` | e.g. `redis://127.0.0.1:6379`. Empty → in-memory fallback (single process only). |
-| `ESCROW_CONTRACT_ID` | Deployed `luminary-escrow` contract (`C…`). Testnet deployment: `CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI`. Without it, funding returns 503 when verification is on. |
+| `ESCROW_CONTRACT_ID` | Deployed `luminary-escrow` contract (`C…`). Testnet deployment: `CBWCY3KMNME5TKJTIRYNA3F32BJ6CG2UWIP7F6I6WYTK2HCAL23AWGKR` (has `order_count`/`list_orders`; the previous `CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI` only serves trades already funded on it, see [contract-luminary/README.md](contract-luminary/README.md#redeploy-done-2026-11)). Without it, funding returns 503 when verification is on. |
 | `VERIFY_STELLAR_TX` | `true` (default): every escrow step (fund / release / refund) is verified on-chain through Soroban RPC before the trade changes state. Set `false` **only** for local tests without network access (`npm run test:smoke`). |
 | `SOROBAN_RPC_URL` | Default `https://soroban-testnet.stellar.org`. |
 | `STELLAR_NETWORK_PASSPHRASE` | Default: Testnet. |

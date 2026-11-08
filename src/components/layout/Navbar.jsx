@@ -12,7 +12,7 @@ const PRIVATE_LINKS = [
 ];
 
 const linkClass = ({ isActive }) =>
-  `whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition ${isActive ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`;
+  `whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition ${isActive ? 'bg-white/10 text-white' : 'text-stellar-gray-muted hover:text-stellar-light'}`;
 
 export default function Navbar() {
   const { address, connecting, connect, disconnect } = useWallet();
@@ -27,12 +27,12 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-20 border-b border-white/5 bg-slate-950/80 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-white/5 bg-stellar-dark/80 backdrop-blur">
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
         <div className="flex min-w-0 items-center gap-6">
           <Link to={ROUTES.market} className="flex items-center gap-2.5">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-amber-300 to-orange-500 shadow-lg shadow-orange-500/20">
-              <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-950" fill="currentColor" aria-hidden>
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-stellar-yellow">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 text-stellar-dark" fill="currentColor" aria-hidden>
                 <path d="M12 2l2.4 7.6H22l-6.2 4.5 2.4 7.6L12 17.2l-6.2 4.5 2.4-7.6L2 9.6h7.6z" />
               </svg>
             </div>
@@ -48,8 +48,8 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="hidden items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300 lg:inline-flex">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+          <span className="hidden items-center gap-2 rounded-full border border-stellar-teal/20 bg-stellar-teal/10 px-3 py-1 text-xs font-medium text-stellar-teal-hover lg:inline-flex">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-stellar-teal" />
             Stellar Testnet
           </span>
 
@@ -65,7 +65,7 @@ export default function Navbar() {
             <button
               onClick={connect}
               disabled={connecting}
-              className="hidden rounded-xl border border-amber-300/30 px-3 py-2 text-sm font-medium text-amber-200 transition hover:bg-amber-300/10 disabled:opacity-60 sm:block"
+              className="hidden rounded-xl border border-stellar-yellow/30 px-3 py-2 text-sm font-medium text-stellar-yellow-hover transition hover:bg-stellar-yellow/10 disabled:opacity-60 sm:block"
             >
               {connecting ? 'Conectando…' : 'Conectar Wallet'}
             </button>
@@ -77,23 +77,23 @@ export default function Navbar() {
                 to={ROUTES.profile}
                 title="Perfil"
                 className={({ isActive }) =>
-                  `grid h-9 w-9 place-items-center rounded-full text-sm font-semibold ${isActive ? 'bg-amber-300 text-slate-950' : 'bg-slate-800 text-amber-200 hover:bg-slate-700'}`
+                  `grid h-9 w-9 place-items-center rounded-full text-sm font-semibold ${isActive ? 'bg-stellar-yellow text-stellar-dark' : 'bg-stellar-gray text-stellar-yellow-hover hover:bg-stellar-gray-light'}`
                 }
               >
                 {user.displayName.slice(0, 2).toUpperCase()}
               </NavLink>
-              <button onClick={onLogout} className="text-sm text-slate-400 hover:text-slate-200">
+              <button onClick={onLogout} className="text-sm text-stellar-gray-muted hover:text-stellar-light">
                 Salir
               </button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to={ROUTES.login} className="px-2 text-sm text-slate-300 hover:text-white">
+              <Link to={ROUTES.login} className="px-2 text-sm text-neutral-300 hover:text-white">
                 Entrar
               </Link>
               <Link
                 to={ROUTES.register}
-                className="rounded-xl bg-gradient-to-r from-amber-300 to-orange-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-orange-500/20 transition hover:brightness-110"
+                className="rounded-xl bg-stellar-yellow px-4 py-2 text-sm font-semibold text-stellar-dark transition hover:bg-stellar-yellow-hover active:bg-stellar-yellow-active"
               >
                 Crear cuenta
               </Link>

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import Stat from '../common/Stat.jsx';
+import Card from '../common/Card.jsx';
+import TxCard from './TxCard.jsx';
 import NoticeBanner from '../common/NoticeBanner.jsx';
 import { INPUT_CLASS } from '../common/FormField.jsx';
 import { useWallet } from '../../hooks/useWallet.js';
@@ -15,7 +17,16 @@ import { fmtNumber, shortenAddress } from '../../utils/format.js';
  */
 export default function WalletPanel() {
   const { address, connect, connecting, error: walletError } = useWallet();
-  const { balance, loading, error: balanceError, refresh } = useStellar(address);
+  const {
+    balance,
+    payments,
+    loading,
+    error: balanceError,
+    paymentsError,
+    refresh,
+  } = useStellar(address, {
+    withPayments: true,
+  });
   const [busy, setBusy] = useState(null);
   const [notice, setNotice] = useState(null);
   const [dest, setDest] = useState('');
@@ -47,16 +58,18 @@ export default function WalletPanel() {
 
   if (!address) {
     return (
-      <section className="flex flex-col items-start gap-4 rounded-2xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-900/30 p-6 sm:flex-row sm:items-center sm:justify-between">
+      <section className="flex flex-col items-start gap-4 rounded-2xl border border-white/5 bg-gradient-to-br from-stellar-surface to-stellar-surface/30 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">Conecta tu wallet</h2>
-          <p className="text-sm text-slate-400">Usa Freighter (en red Testnet) para ver tu balance y operar.</p>
-          {walletError && <p className="mt-2 text-sm text-rose-300">{walletError}</p>}
+          <p className="text-sm text-stellar-gray-muted">
+            Usa Freighter (en red Testnet) para ver tu balance y operar.
+          </p>
+          {walletError && <p className="mt-2 text-sm text-stellar-danger">{walletError}</p>}
         </div>
         <button
           onClick={connect}
           disabled={connecting}
-          className="rounded-xl bg-gradient-to-r from-amber-300 to-orange-500 px-5 py-2.5 text-sm font-semibold text-slate-950 disabled:opacity-60"
+          className="rounded-xl bg-stellar-yellow px-5 py-2.5 text-sm font-semibold text-stellar-dark disabled:opacity-60"
         >
           {connecting ? 'Conectando…' : 'Conectar Freighter'}
         </button>
@@ -67,7 +80,7 @@ export default function WalletPanel() {
   return (
     <div>
       {errorText && (
-        <div className="mb-4 rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
+        <div className="mb-4 rounded-xl border border-stellar-danger/20 bg-stellar-danger/10 px-4 py-3 text-sm text-stellar-danger-light">
           {errorText}
         </div>
       )}
@@ -86,17 +99,21 @@ export default function WalletPanel() {
               href={EXPLORER_ACCOUNT_URL + address}
               target="_blank"
               rel="noreferrer"
-              className="font-mono hover:text-amber-200"
+              className="font-mono hover:text-stellar-yellow-hover"
             >
               {shortenAddress(address, 8)} ↗
             </a>
           }
         />
 
-        <div className="flex flex-col gap-3 rounded-2xl border border-white/5 bg-slate-900/60 p-5">
+        <div className="flex flex-col gap-3 rounded-2xl border border-white/5 bg-stellar-surface/60 p-5">
           <div className="flex items-center justify-between">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Acciones</p>
-            <button onClick={refresh} disabled={loading} className="text-xs text-slate-400 hover:text-slate-200">
+            <p className="text-xs uppercase tracking-wide text-neutral-500">Acciones</p>
+            <button
+              onClick={refresh}
+              disabled={loading}
+              className="text-xs text-stellar-gray-muted hover:text-stellar-light"
+            >
               {loading ? 'Actualizando…' : '↻ Actualizar'}
             </button>
           </div>
@@ -105,7 +122,7 @@ export default function WalletPanel() {
             <button
               onClick={onFund}
               disabled={!!busy}
-              className="rounded-xl bg-sky-400 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
+              className="rounded-xl bg-sky-400 py-2 text-sm font-semibold text-stellar-dark disabled:opacity-50"
             >
               {busy === 'fund' ? 'Fondeando…' : 'Fondear con Friendbot'}
             </button>
@@ -114,7 +131,7 @@ export default function WalletPanel() {
             <button
               onClick={onTrust}
               disabled={!!busy}
-              className="rounded-xl bg-amber-300 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50"
+              className="rounded-xl bg-stellar-yellow py-2 text-sm font-semibold text-stellar-dark disabled:opacity-50"
             >
               {busy === 'trust' ? 'Firmando…' : 'Habilitar USDC (trustline)'}
             </button>
@@ -145,7 +162,7 @@ export default function WalletPanel() {
                 />
                 <button
                   disabled={!!busy}
-                  className="shrink-0 rounded-lg bg-amber-300 px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+                  className="shrink-0 rounded-lg bg-stellar-yellow px-4 text-sm font-semibold text-stellar-dark disabled:opacity-50"
                 >
                   {busy === 'send' ? '…' : 'Enviar'}
                 </button>
@@ -154,6 +171,22 @@ export default function WalletPanel() {
           )}
         </div>
       </section>
+
+      <Card title="Movimientos recientes" className="mt-4">
+        {paymentsError ? (
+          <p className="text-sm text-stellar-danger">No se pudieron cargar los movimientos: {paymentsError}</p>
+        ) : loading && payments.length === 0 ? (
+          <p className="text-sm text-stellar-gray-muted">Cargando…</p>
+        ) : payments.length === 0 ? (
+          <p className="text-sm text-stellar-gray-muted">Esta cuenta aún no tiene movimientos.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {payments.map((tx) => (
+              <TxCard key={tx.id} tx={tx} />
+            ))}
+          </ul>
+        )}
+      </Card>
     </div>
   );
 }

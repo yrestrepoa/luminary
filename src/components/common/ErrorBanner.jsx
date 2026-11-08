@@ -3,7 +3,7 @@ export default function ErrorBanner({ children }) {
   return (
     <div
       role="alert"
-      className="mb-6 rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200"
+      className="mb-6 rounded-xl border border-stellar-danger/20 bg-stellar-danger/10 px-4 py-3 text-sm text-stellar-danger-light"
     >
       {children}
     </div>

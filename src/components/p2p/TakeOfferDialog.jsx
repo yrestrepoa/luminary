@@ -45,14 +45,14 @@ export default function TakeOfferDialog({ offer, user, onConfirm, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-30 grid place-items-center bg-slate-950/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-30 grid place-items-center bg-stellar-dark/80 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="take-offer-title"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl"
+        className="w-full max-w-md rounded-2xl border border-white/10 bg-stellar-surface p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
@@ -60,7 +60,7 @@ export default function TakeOfferDialog({ offer, user, onConfirm, onClose }) {
             <h2 id="take-offer-title" className="text-lg font-semibold">
               {userBuys ? 'Comprar' : 'Vender'} USDC a {offer.merchant}
             </h2>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-stellar-gray-muted">
               {fmtFiat(offer.price, offer.currency)} por USDC · disponible {fmtNumber(offer.available, 7)} USDC
             </p>
           </div>
@@ -71,7 +71,7 @@ export default function TakeOfferDialog({ offer, user, onConfirm, onClose }) {
 
         <ErrorBanner>{error}</ErrorBanner>
         {needsAddress ? (
-          <div className="rounded-xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
+          <div className="rounded-xl border border-stellar-yellow/20 bg-stellar-yellow/10 p-4 text-sm text-stellar-cream">
             Para recibir USDC necesitas vincular tu dirección Stellar.{' '}
             <Link to={ROUTES.profile} className="font-semibold underline">
               Ir a mi perfil
@@ -97,11 +97,11 @@ export default function TakeOfferDialog({ offer, user, onConfirm, onClose }) {
                   : undefined
               }
             />
-            <div className="flex items-center justify-between rounded-xl bg-slate-950/50 px-4 py-3 text-sm">
-              <span className="text-slate-400">{userBuys ? 'Pagarás' : 'Recibirás'}</span>
+            <div className="flex items-center justify-between rounded-xl bg-stellar-dark/50 px-4 py-3 text-sm">
+              <span className="text-stellar-gray-muted">{userBuys ? 'Pagarás' : 'Recibirás'}</span>
               <span className="text-lg font-semibold tabular-nums">{fmtFiat(fiat, offer.currency)}</span>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-neutral-500">
               {userBuys
                 ? `Pagarás por ${offer.paymentMethod}${offer.bank ? ` (${offer.bank})` : ''}; el vendedor libera los USDC a tu dirección vinculada.`
                 : 'Recibirás el pago fiat del comprador y luego liberarás los USDC desde tu wallet Freighter.'}

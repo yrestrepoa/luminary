@@ -93,14 +93,18 @@ export default function CreateOffer() {
           <ErrorBanner>{error}</ErrorBanner>
           <form onSubmit={onSubmit} className="flex flex-col gap-5">
             <div>
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Quiero</p>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-stellar-gray-muted">Quiero</p>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { key: 'sell', label: 'Vender USDC', active: 'border-rose-400/50 bg-rose-400/10 text-rose-200' },
+                  {
+                    key: 'sell',
+                    label: 'Vender USDC',
+                    active: 'border-stellar-danger/50 bg-stellar-danger/10 text-stellar-danger-light',
+                  },
                   {
                     key: 'buy',
                     label: 'Comprar USDC',
-                    active: 'border-emerald-400/50 bg-emerald-400/10 text-emerald-200',
+                    active: 'border-stellar-teal/50 bg-stellar-teal/10 text-stellar-teal-light',
                   },
                 ].map((t) => (
                   <button
@@ -108,7 +112,7 @@ export default function CreateOffer() {
                     type="button"
                     aria-pressed={form.type === t.key}
                     onClick={() => set('type', t.key)}
-                    className={`rounded-xl border py-2.5 text-sm font-semibold transition ${form.type === t.key ? t.active : 'border-white/10 text-slate-400 hover:text-slate-200'}`}
+                    className={`rounded-xl border py-2.5 text-sm font-semibold transition ${form.type === t.key ? t.active : 'border-white/10 text-stellar-gray-muted hover:text-stellar-light'}`}
                   >
                     {t.label}
                   </button>
@@ -117,7 +121,7 @@ export default function CreateOffer() {
             </div>
 
             {!sells && !user.stellarAddress && (
-              <div className="rounded-xl border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-100">
+              <div className="rounded-xl border border-stellar-yellow/20 bg-stellar-yellow/10 p-3 text-sm text-stellar-cream">
                 Para comprar USDC necesitas una dirección Stellar vinculada.{' '}
                 <Link to={ROUTES.profile} className="font-semibold underline">
                   Vincular
@@ -223,7 +227,7 @@ export default function CreateOffer() {
         </Card>
 
         <div>
-          <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">Vista previa</p>
+          <p className="mb-2 text-xs uppercase tracking-wide text-neutral-500">Vista previa</p>
           <OfferCard offer={preview} disabled actionLabel="Así la verán otros" />
         </div>
       </div>

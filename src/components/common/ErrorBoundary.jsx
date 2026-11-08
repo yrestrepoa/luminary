@@ -30,10 +30,10 @@ export default class ErrorBoundary extends Component {
     return (
       <div
         role="alert"
-        className="mx-auto max-w-lg rounded-2xl border border-rose-400/20 bg-rose-400/10 p-6 text-center"
+        className="mx-auto max-w-lg rounded-2xl border border-stellar-danger/20 bg-stellar-danger/10 p-6 text-center"
       >
-        <h1 className="mb-2 text-lg font-semibold text-rose-100">Algo salió mal</h1>
-        <p className="mb-4 text-sm text-rose-200/80">
+        <h1 className="mb-2 text-lg font-semibold text-stellar-danger-light">Algo salió mal</h1>
+        <p className="mb-4 text-sm text-stellar-danger-light/80">
           {chunkFailed
             ? 'Hay una nueva versión de la aplicación. Recarga la página para continuar.'
             : 'Ocurrió un error inesperado al mostrar esta página.'}
@@ -41,7 +41,7 @@ export default class ErrorBoundary extends Component {
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="rounded-xl bg-rose-300 px-4 py-2 text-sm font-semibold text-slate-950"
+          className="rounded-xl bg-stellar-danger px-4 py-2 text-sm font-semibold text-stellar-dark"
         >
           Recargar
         </button>

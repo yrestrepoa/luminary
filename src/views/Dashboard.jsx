@@ -44,7 +44,7 @@ export default function Dashboard() {
             </Link>
             <Link
               to={ROUTES.createOffer}
-              className="rounded-xl bg-gradient-to-r from-amber-300 to-orange-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-orange-500/20 hover:brightness-110"
+              className="rounded-xl bg-stellar-yellow px-4 py-2 text-sm font-semibold text-stellar-dark hover:bg-stellar-yellow-hover active:bg-stellar-yellow-active"
             >
               + Publicar oferta
             </Link>
@@ -53,7 +53,7 @@ export default function Dashboard() {
       />
 
       {!user.stellarAddress && (
-        <div className="mb-6 rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+        <div className="mb-6 rounded-xl border border-stellar-yellow/20 bg-stellar-yellow/10 px-4 py-3 text-sm text-stellar-cream">
           Aún no vinculaste una dirección Stellar: la necesitas para recibir USDC.{' '}
           <Link to={ROUTES.profile} className="font-semibold underline">
             Vincular ahora
@@ -61,7 +61,7 @@ export default function Dashboard() {
         </div>
       )}
       {walletMismatch && (
-        <div className="mb-6 rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+        <div className="mb-6 rounded-xl border border-stellar-yellow/20 bg-stellar-yellow/10 px-4 py-3 text-sm text-stellar-cream">
           La wallet conectada en Freighter no coincide con la dirección vinculada a tu cuenta.
         </div>
       )}
@@ -92,7 +92,10 @@ export default function Dashboard() {
             <Card
               title="Operaciones recientes"
               action={
-                <Link to={`${ROUTES.myOffers}?tab=history`} className="text-sm text-amber-300 hover:text-amber-200">
+                <Link
+                  to={`${ROUTES.myOffers}?tab=history`}
+                  className="text-sm text-stellar-yellow hover:text-stellar-yellow-hover"
+                >
                   Ver historial →
                 </Link>
               }

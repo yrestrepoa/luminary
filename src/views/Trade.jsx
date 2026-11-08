@@ -34,16 +34,21 @@ const ACTIONS = {
 function Row({ label, children }) {
   return (
     <div className="flex items-start justify-between gap-4 py-2.5">
-      <dt className="text-sm text-slate-400">{label}</dt>
+      <dt className="text-sm text-stellar-gray-muted">{label}</dt>
       <dd className="text-right text-sm font-medium">{children}</dd>
     </div>
   );
 }
 
 function Address({ value }) {
-  if (!value) return <span className="text-slate-500">Sin vincular</span>;
+  if (!value) return <span className="text-neutral-500">Sin vincular</span>;
   return (
-    <a href={EXPLORER_ACCOUNT_URL + value} target="_blank" rel="noreferrer" className="font-mono hover:text-amber-200">
+    <a
+      href={EXPLORER_ACCOUNT_URL + value}
+      target="_blank"
+      rel="noreferrer"
+      className="font-mono hover:text-stellar-yellow-hover"
+    >
       {shortenAddress(value, 6)} ↗
     </a>
   );
@@ -51,14 +56,21 @@ function Address({ value }) {
 
 function TxLink({ hash }) {
   return (
-    <a href={EXPLORER_TX_URL + hash} target="_blank" rel="noreferrer" className="font-mono hover:text-amber-200">
+    <a
+      href={EXPLORER_TX_URL + hash}
+      target="_blank"
+      rel="noreferrer"
+      className="font-mono hover:text-stellar-yellow-hover"
+    >
       {shortenAddress(hash, 6)} ↗
     </a>
   );
 }
 
 const Warn = ({ children }) => (
-  <div className="rounded-xl border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-100">{children}</div>
+  <div className="rounded-xl border border-stellar-yellow/20 bg-stellar-yellow/10 p-3 text-sm text-stellar-cream">
+    {children}
+  </div>
 );
 
 /** Muestra `children` solo si Freighter está conectada a `required` (la cuenta que debe firmar). */
@@ -157,7 +169,10 @@ export default function Trade() {
   if (error || !trade) {
     return (
       <EmptyState title="Operación no encontrada" text={error?.message}>
-        <Link to={ROUTES.myOffers + '?tab=history'} className="text-sm font-medium text-amber-300 hover:text-amber-200">
+        <Link
+          to={ROUTES.myOffers + '?tab=history'}
+          className="text-sm font-medium text-stellar-yellow hover:text-stellar-yellow-hover"
+        >
           Ver mis operaciones
         </Link>
       </EmptyState>
@@ -276,7 +291,7 @@ export default function Trade() {
 
   const reclaimBlock = role === 'seller' && escrowed && (
     <div className="flex flex-col gap-2 border-t border-white/5 pt-4">
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-stellar-gray-muted">
         {canReclaim
           ? 'El plazo de reembolso venció: puedes recuperar los USDC del escrow si la operación no se completó.'
           : `Podrás reclamar los USDC si la operación no avanza${reclaimEta !== null ? ` (en ~${reclaimEta} h, ledger ${escrow.refundAfterLedger})` : ' tras el plazo de reembolso (~24 h desde el depósito)'}.`}
@@ -342,7 +357,7 @@ export default function Trade() {
                 {/* ---------------- Comprador ---------------- */}
                 {role === 'buyer' && trade.status === 'pending' && (
                   <div className="flex flex-col gap-4">
-                    <p className="text-sm text-slate-300">
+                    <p className="text-sm text-neutral-300">
                       Esperando que {trade.seller.displayName} deposite los {usdc} en el contrato de escrow.{' '}
                       <strong className="text-white">No envíes el pago fiat todavía.</strong>
                     </p>
@@ -355,7 +370,7 @@ export default function Trade() {
                 )}
                 {role === 'buyer' && trade.status === 'funded' && (
                   <div className="flex flex-col gap-4">
-                    <p className="text-sm text-slate-300">
+                    <p className="text-sm text-neutral-300">
                       Los {usdc} están bloqueados en el escrow on-chain. Envía{' '}
                       <strong className="text-white">{fmtFiat(trade.fiatAmount, trade.currency)}</strong> a{' '}
                       {trade.seller.displayName} por <strong className="text-white">{trade.paymentMethod}</strong>
@@ -373,8 +388,8 @@ export default function Trade() {
                         Ya realicé el pago
                       </Button>
                     </div>
-                    <details className="text-sm text-slate-400">
-                      <summary className="cursor-pointer hover:text-slate-200">
+                    <details className="text-sm text-stellar-gray-muted">
+                      <summary className="cursor-pointer hover:text-stellar-light">
                         ¿Quieres cancelar? Devuelve los USDC al vendedor
                       </summary>
                       <div className="mt-3">
@@ -394,7 +409,7 @@ export default function Trade() {
                 )}
                 {role === 'buyer' && (trade.status === 'paid' || trade.status === 'disputed') && (
                   <div className="flex flex-col gap-4">
-                    <p className="text-sm text-slate-300">
+                    <p className="text-sm text-neutral-300">
                       {trade.status === 'paid' ? (
                         <>
                           Esperando que {trade.seller.displayName} confirme tu pago y libere los USDC del escrow a{' '}
@@ -414,8 +429,8 @@ export default function Trade() {
                         </Button>
                       )}
                     </div>
-                    <details className="text-sm text-slate-400">
-                      <summary className="cursor-pointer hover:text-slate-200">
+                    <details className="text-sm text-stellar-gray-muted">
+                      <summary className="cursor-pointer hover:text-stellar-light">
                         Desistir: devolver los USDC al vendedor
                       </summary>
                       <div className="mt-3">
@@ -437,7 +452,7 @@ export default function Trade() {
                 {/* ---------------- Vendedor ---------------- */}
                 {role === 'seller' && trade.status === 'pending' && (
                   <div className="flex flex-col gap-4">
-                    <p className="text-sm text-slate-300">
+                    <p className="text-sm text-neutral-300">
                       Deposita los {usdc} en el contrato de escrow. Quedan bloqueados on-chain hasta que los liberes a{' '}
                       {trade.buyer.displayName} (tras recibir {fmtFiat(trade.fiatAmount, trade.currency)}) o se
                       reembolsen.
@@ -452,7 +467,7 @@ export default function Trade() {
                     <WalletGate required={trade.seller.stellarAddress}>
                       <div className="flex flex-col gap-2">
                         {insufficient && (
-                          <p className="text-sm text-rose-300">
+                          <p className="text-sm text-stellar-danger">
                             Tu balance USDC ({fmtNumber(balance.usdc, 7)}) no alcanza.
                           </p>
                         )}
@@ -476,7 +491,7 @@ export default function Trade() {
                 )}
                 {role === 'seller' && trade.status === 'funded' && (
                   <div className="flex flex-col gap-4">
-                    <p className="text-sm text-slate-300">
+                    <p className="text-sm text-neutral-300">
                       Los {usdc} están en escrow. Esperando que {trade.buyer.displayName} envíe{' '}
                       <strong className="text-white">{fmtFiat(trade.fiatAmount, trade.currency)}</strong> por{' '}
                       {trade.paymentMethod}.
@@ -486,7 +501,7 @@ export default function Trade() {
                 )}
                 {role === 'seller' && (trade.status === 'paid' || trade.status === 'disputed') && (
                   <div className="flex flex-col gap-4">
-                    <p className="text-sm text-slate-300">
+                    <p className="text-sm text-neutral-300">
                       {trade.status === 'paid' ? (
                         <>
                           {trade.buyer.displayName} indica que pagó{' '}
@@ -519,8 +534,8 @@ export default function Trade() {
                 )}
 
                 {manualAction && (
-                  <details className="mt-4 text-sm text-slate-400">
-                    <summary className="cursor-pointer hover:text-slate-200">
+                  <details className="mt-4 text-sm text-stellar-gray-muted">
+                    <summary className="cursor-pointer hover:text-stellar-light">
                       ¿Enviaste la transacción de {ACTIONS[manualAction].label} con otra herramienta? Registra el hash
                     </summary>
                     <form
@@ -556,7 +571,7 @@ export default function Trade() {
 
             {/* ---------------- Estados finales ---------------- */}
             {trade.status === 'released' && (
-              <p className="text-sm text-emerald-200">
+              <p className="text-sm text-stellar-teal-light">
                 Operación completada. El escrow envió los USDC a {trade.buyer.displayName}.{' '}
                 {trade.stellarTxHash && (
                   <a
@@ -571,7 +586,7 @@ export default function Trade() {
               </p>
             )}
             {trade.status === 'refunded' && (
-              <p className="text-sm text-slate-300">
+              <p className="text-sm text-neutral-300">
                 Operación reembolsada: el escrow devolvió los USDC a {trade.seller.displayName} y volvieron a la oferta.{' '}
                 {trade.stellarTxHash && (
                   <a
@@ -586,11 +601,13 @@ export default function Trade() {
               </p>
             )}
             {trade.status === 'cancelled' && (
-              <p className="text-sm text-slate-400">Operación cancelada. Los USDC reservados volvieron a la oferta.</p>
+              <p className="text-sm text-stellar-gray-muted">
+                Operación cancelada. Los USDC reservados volvieron a la oferta.
+              </p>
             )}
           </Card>
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-neutral-500">
             Escrow on-chain: el vendedor deposita los USDC en un contrato Soroban antes de que el comprador pague. Solo
             el vendedor puede liberarlos al comprador; el comprador puede desistir devolviéndolos, y el vendedor puede
             reclamarlos tras ~24 h si la operación no se completa. El servidor verifica cada paso en la red antes de
@@ -607,7 +624,7 @@ export default function Trade() {
             </Row>
             <Row label="Método de pago">
               {trade.paymentMethod}
-              {trade.bank && <span className="block text-xs text-slate-400">{trade.bank}</span>}
+              {trade.bank && <span className="block text-xs text-stellar-gray-muted">{trade.bank}</span>}
             </Row>
             <Row label="Comprador">
               {trade.buyer.displayName}
@@ -631,7 +648,7 @@ export default function Trade() {
                   href={EXPLORER_CONTRACT_URL + escrow.contractId}
                   target="_blank"
                   rel="noreferrer"
-                  className="font-mono hover:text-amber-200"
+                  className="font-mono hover:text-stellar-yellow-hover"
                 >
                   {shortenAddress(escrow.contractId, 6)} ↗
                 </a>

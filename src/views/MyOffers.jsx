@@ -49,14 +49,17 @@ function OffersTab() {
       {notice && <NoticeBanner notice={notice} onClose={() => setNotice(null)} />}
       {!offers?.length ? (
         <EmptyState title="No has publicado ofertas" text="Publica una oferta para comprar o vender USDC.">
-          <Link to={ROUTES.createOffer} className="text-sm font-medium text-amber-300 hover:text-amber-200">
+          <Link
+            to={ROUTES.createOffer}
+            className="text-sm font-medium text-stellar-yellow hover:text-stellar-yellow-hover"
+          >
             Publicar oferta
           </Link>
         </EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-white/5 bg-slate-900/60">
+        <div className="overflow-x-auto rounded-2xl border border-white/5 bg-stellar-surface/60">
           <table className="w-full min-w-[720px] text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-left text-xs uppercase tracking-wide text-neutral-500">
               <tr className="border-b border-white/5">
                 <th className="px-5 py-3 font-medium">Tipo</th>
                 <th className="px-5 py-3 font-medium">Precio</th>
@@ -71,7 +74,7 @@ function OffersTab() {
               {offers.map((o) => (
                 <tr key={o.id}>
                   <td className="px-5 py-3">
-                    <span className={o.type === 'sell' ? 'text-rose-300' : 'text-emerald-300'}>
+                    <span className={o.type === 'sell' ? 'text-stellar-danger' : 'text-stellar-teal-hover'}>
                       {o.type === 'sell' ? 'Venta' : 'Compra'}
                     </span>
                   </td>
@@ -79,12 +82,12 @@ function OffersTab() {
                   <td className="px-5 py-3 tabular-nums">{fmtNumber(o.available, 7)} USDC</td>
                   <td className="px-5 py-3">
                     {o.paymentMethod}
-                    {o.bank && <span className="text-slate-500"> · {o.bank}</span>}
+                    {o.bank && <span className="text-neutral-500"> · {o.bank}</span>}
                   </td>
                   <td className="px-5 py-3">
                     <StatusBadge status={o.status} map={OFFER_STATUS} />
                   </td>
-                  <td className="px-5 py-3 text-slate-400">{fmtDate(o.createdAt)}</td>
+                  <td className="px-5 py-3 text-stellar-gray-muted">{fmtDate(o.createdAt)}</td>
                   <td className="px-5 py-3">
                     {o.status !== 'closed' && (
                       <div className="flex justify-end gap-1">
@@ -111,7 +114,7 @@ function OffersTab() {
                         )}
                         <Button
                           variant="ghost"
-                          className="hover:!text-rose-300"
+                          className="hover:!text-stellar-danger"
                           disabled={busy === o.id}
                           onClick={() =>
                             window.confirm('¿Cerrar esta oferta? No se puede reabrir.') &&
@@ -169,7 +172,7 @@ export default function MyOffers() {
         action={
           <Link
             to={ROUTES.createOffer}
-            className="rounded-xl bg-gradient-to-r from-amber-300 to-orange-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-orange-500/20 hover:brightness-110"
+            className="rounded-xl bg-stellar-yellow px-4 py-2 text-sm font-semibold text-stellar-dark hover:bg-stellar-yellow-hover active:bg-stellar-yellow-active"
           >
             + Publicar oferta
           </Link>

@@ -49,7 +49,15 @@ export const releaseArgs = ({ seller, tradeId }) => [addr(seller), u64(tradeId)]
 export const refundArgs = ({ caller, seller, tradeId }) => [addr(caller), addr(seller), u64(tradeId)];
 
 /** ScVal del struct `Escrow` tal como lo devuelve `get_escrow` (mapa con claves ordenadas). */
-export function escrowScVal({ seller, buyer, token, amount, refundAfterLedger = 1000, status = 'funded' }) {
+export function escrowScVal({
+  seller,
+  buyer,
+  token,
+  amount,
+  refundAfterLedger = 1000,
+  status = 'funded',
+  tradeId = 1,
+}) {
   const entry = (key, val) => new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol(key), val });
   return xdr.ScVal.scvMap([
     entry('amount', i128(amount)),
@@ -58,6 +66,7 @@ export function escrowScVal({ seller, buyer, token, amount, refundAfterLedger = 
     entry('seller', addr(seller)),
     entry('status', u32(STATUS[status])),
     entry('token', addr(token)),
+    entry('trade_id', u64(tradeId)),
   ]);
 }
 

@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { startTradeExpiryJob } from '../../jobs/tradeExpiry.js';
+import { Address, Keypair, StrKey } from '@stellar/stellar-sdk';
+import { config } from '../../config.js';
+import { defaultFundedOnChain, startTradeExpiryJob } from '../../jobs/tradeExpiry.js';
+import { escrowScVal, mockSorobanRpc } from '../helpers/soroban.js';
 
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 
@@ -50,5 +53,45 @@ describe('startTradeExpiryJob', () => {
     const job = startTradeExpiryJob({ intervalMs: 1000, ttlMs: 0, logger, run });
     await job.stop();
     expect(run).not.toHaveBeenCalled();
+  });
+});
+
+describe('defaultFundedOnChain', () => {
+  const seller = Keypair.random().publicKey();
+  const buyer = Keypair.random().publicKey();
+  const oldContract = StrKey.encodeContract(Buffer.alloc(32, 9));
+  const tokenContract = StrKey.encodeContract(Buffer.alloc(32, 3));
+  const verifyTx = config.stellar.verifyTx;
+  const simulatedContract = (simulateTransaction) => {
+    const [tx] = simulateTransaction.mock.calls[0];
+    return Address.fromScAddress(tx.operations[0].func.invokeContract.contractAddress).toString();
+  };
+
+  afterEach(() => {
+    config.stellar.verifyTx = verifyTx;
+    vi.restoreAllMocks();
+  });
+
+  it("checks the trade's own escrow_contract_id when it has one", async () => {
+    config.stellar.verifyTx = true;
+    const escrow = escrowScVal({ seller, buyer, token: tokenContract, amount: 1n, tradeId: 5 });
+    const { simulateTransaction } = mockSorobanRpc({ escrow });
+    const trade = { id: 5, seller_address: seller, escrow_contract_id: oldContract };
+    expect(await defaultFundedOnChain(trade)).toBe(true);
+    expect(simulatedContract(simulateTransaction)).toBe(oldContract);
+  });
+
+  it('falls back to the configured contract and reports a missing escrow', async () => {
+    config.stellar.verifyTx = true;
+    const { simulateTransaction } = mockSorobanRpc({ escrow: null });
+    expect(await defaultFundedOnChain({ id: 5, seller_address: seller, escrow_contract_id: null })).toBe(false);
+    expect(simulatedContract(simulateTransaction)).toBe(config.stellar.escrowContractId);
+  });
+
+  it('does not query the chain when verification is off', async () => {
+    config.stellar.verifyTx = false;
+    const { simulateTransaction } = mockSorobanRpc({ escrow: null });
+    expect(await defaultFundedOnChain({ id: 5, seller_address: seller, escrow_contract_id: oldContract })).toBe(false);
+    expect(simulateTransaction).not.toHaveBeenCalled();
   });
 });

@@ -39,6 +39,7 @@ describeIntegration('escrow verification (mocked Soroban RPC)', (ctx) => {
       token: tokenId,
       amount: BigInt(t.escrow.amountStroops),
       refundAfterLedger: 98765,
+      tradeId: t.id,
       ...over,
     });
   const createEnv = (t, over = {}) =>

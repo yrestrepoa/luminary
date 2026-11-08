@@ -4,7 +4,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../utils/validation.js';
 import { HttpError, badRequest, conflict, forbidden, notFound, parseId } from '../utils/http.js';
 import { toTrade } from '../utils/serializers.js';
-import { verifyEscrowClosed, verifyEscrowFunded } from '../utils/escrow.js';
+import { escrowContractIdFor, verifyEscrowClosed, verifyEscrowFunded } from '../utils/escrow.js';
 import { config } from '../config.js';
 
 const router = Router();
@@ -168,7 +168,7 @@ router.post('/:id/fund', async (req, res) => {
   if (!trade.seller_address) throw badRequest('Vincula tu dirección Stellar en tu perfil antes de depositar');
   if (!trade.buyer_address) throw badRequest('El comprador no tiene dirección Stellar vinculada');
 
-  const contractId = config.stellar.escrowContractId;
+  const contractId = escrowContractIdFor(trade);
   let refundAfterLedger = null;
   if (config.stellar.verifyTx) {
     if (!contractId)

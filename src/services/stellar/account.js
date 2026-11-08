@@ -1,4 +1,4 @@
-import { StrKey } from '@stellar/stellar-sdk';
+import { StrKey, scValToNative, xdr } from '@stellar/stellar-sdk';
 import { FRIENDBOT_URL, USDC_CODE, USDC_ISSUER } from '../../config/stellar.js';
 import { server } from './client.js';
 import { isNotFound } from './errors.js';
@@ -30,6 +30,7 @@ export async function checkBalance(publicKey) {
  * @returns {import('../../types/index.js').RecentPayment}
  */
 export function toPayment(record, publicKey) {
+  if (record.type === 'invoke_host_function') return toContractCall(record, publicKey);
   const isCreate = record.type === 'create_account';
   const from = isCreate ? record.funder : record.from;
   const to = isCreate ? record.account : record.to;
@@ -41,6 +42,38 @@ export function toPayment(record, publicKey) {
     amount: isCreate ? record.starting_balance : record.amount,
     asset: isCreate || record.asset_type === 'native' ? 'XLM' : record.asset_code,
     counterparty: incoming ? from : to,
+    incoming,
+    createdAt: record.created_at,
+  };
+}
+
+/** Nombre del método invocado (p. ej. 'create', 'release'); parameters[1] es un ScVal Symbol. */
+function contractFunctionName(record) {
+  const raw = record.parameters?.[1];
+  if (!raw?.value) return null;
+  try {
+    const val = xdr.ScVal.fromXDR(raw.value, 'base64');
+    return val.type === 'scvSymbol' ? scValToNative(val) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Invocación de un contrato Soroban (escrow): no trae `from`/`to`/`amount`; el movimiento de
+ * activos de la cuenta se deriva de `asset_balance_changes`. Sin cambios propios → solo etiqueta.
+ */
+function toContractCall(record, publicKey) {
+  const change = (record.asset_balance_changes ?? []).find((c) => c.to === publicKey || c.from === publicKey);
+  const incoming = change ? change.to === publicKey : false;
+  return {
+    id: record.id,
+    hash: record.transaction_hash,
+    kind: record.type,
+    contractFn: contractFunctionName(record),
+    amount: change?.amount ?? null,
+    asset: change ? (change.asset_type === 'native' ? 'XLM' : change.asset_code) : null,
+    counterparty: change ? (incoming ? change.from : change.to) : null,
     incoming,
     createdAt: record.created_at,
   };

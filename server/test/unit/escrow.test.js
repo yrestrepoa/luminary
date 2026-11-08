@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Keypair, StrKey } from '@stellar/stellar-sdk';
-import { readEscrow, verifyEscrowClosed, verifyEscrowFunded, verifyInvocation } from '../../utils/escrow.js';
+import {
+  escrowContractIdFor,
+  readEscrow,
+  verifyEscrowClosed,
+  verifyEscrowFunded,
+  verifyInvocation,
+} from '../../utils/escrow.js';
 import { config } from '../../config.js';
 import {
   classicEnvelope,
@@ -32,10 +38,21 @@ const createTx = (over = {}) =>
     ...over,
   });
 const fundedEscrow = (over = {}) =>
-  escrowScVal({ seller, buyer, token: tokenId, amount, refundAfterLedger: 4242, ...over });
+  escrowScVal({ seller, buyer, token: tokenId, amount, refundAfterLedger: 4242, tradeId, ...over });
 const fundArgs = { txHash: hash('a'), contractId, tokenId, seller, buyer, tradeId, amount: '10.5', notBefore };
 
 afterEach(() => vi.restoreAllMocks());
+
+describe('escrowContractIdFor', () => {
+  it("prefers the trade's own escrow_contract_id (survives a contract switch-over)", () => {
+    expect(escrowContractIdFor({ escrow_contract_id: otherContract })).toBe(otherContract);
+  });
+
+  it('falls back to the configured ESCROW_CONTRACT_ID', () => {
+    expect(escrowContractIdFor({ escrow_contract_id: null })).toBe(contractId);
+    expect(escrowContractIdFor({})).toBe(contractId);
+  });
+});
 
 describe('readEscrow', () => {
   it('decodes the on-chain Escrow struct', async () => {

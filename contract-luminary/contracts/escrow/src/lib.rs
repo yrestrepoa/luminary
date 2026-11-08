@@ -5,6 +5,8 @@
 //! * `release` — seller sends the escrowed amount to the buyer (seller auth).
 //! * `refund`  — returns the amount to the seller. Allowed for the buyer at any time
 //!   (voluntary cancel), or for the seller once `refund_after_ledger` has been reached.
+//! * `order_count` / `list_orders` — read-only, paginated view of every escrow ever created
+//!   on this deployment (see the README for archival and filtering caveats).
 //!
 //! Escrows are keyed by `(seller, trade_id)`: only the seller can create an entry under
 //! their own address, so nobody can front-run a trade id to block it. There is no admin
@@ -22,7 +24,10 @@ pub const REFUND_TIMEOUT_LEDGERS: u32 = DAY_IN_LEDGERS;
 /// Escrow entries (and the contract instance) are kept alive for ~30 days after each write.
 const TTL_EXTEND_TO: u32 = 30 * DAY_IN_LEDGERS;
 const TTL_THRESHOLD: u32 = TTL_EXTEND_TO - DAY_IN_LEDGERS;
-const MAX_ORDER_PAGE_SIZE: u32 = 100;
+/// Maximum index slots scanned by one `list_orders` call. Each slot reads two persistent
+/// entries (`Order(i)` and the `Escrow` it points to), so a page of 25 touches ~50 entries
+/// plus the instance and code: well inside Soroban's per-transaction footprint/read limits.
+pub const MAX_ORDER_PAGE_SIZE: u32 = 25;
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -42,10 +47,12 @@ pub enum Error {
     TooEarly = 6,
     /// `refund` caller is neither the buyer nor the seller.
     NotAParty = 7,
-    /// The order-list page size must be between 1 and 100.
+    /// The order-list page size must be between 1 and `MAX_ORDER_PAGE_SIZE` (25).
     InvalidLimit = 8,
     /// The sequential order index has reached its maximum value.
     OrderIndexFull = 9,
+    /// Order indexes are 1-based: `list_orders` was called with `start == 0`.
+    InvalidStart = 10,
 }
 
 #[contracttype]
@@ -128,21 +135,22 @@ fn load(env: &Env, key: &DataKey) -> Result<Escrow, Error> {
     env.storage().persistent().get(key).ok_or(Error::NotFound)
 }
 
-fn save(env: &Env, key: &DataKey, escrow: &Escrow) {
-    env.storage().persistent().set(key, escrow);
+fn extend_persistent(env: &Env, key: &DataKey) {
     env.storage()
         .persistent()
         .extend_ttl(key, TTL_THRESHOLD, TTL_EXTEND_TO);
+}
+
+/// Writes an escrow and extends, together, the TTL of the escrow and of its two order-index
+/// entries (`EscrowOrder` and `Order`), so all three stay alive (and later archive) together.
+/// Called by create, release and refund; `create` must write the index entries before this.
+fn save(env: &Env, key: &DataKey, escrow: &Escrow) {
+    env.storage().persistent().set(key, escrow);
+    extend_persistent(env, key);
     let order_key = DataKey::EscrowOrder(escrow.seller.clone(), escrow.trade_id);
     if let Some(order_id) = env.storage().persistent().get::<_, u64>(&order_key) {
-        env.storage()
-            .persistent()
-            .extend_ttl(&order_key, TTL_THRESHOLD, TTL_EXTEND_TO);
-        env.storage().persistent().extend_ttl(
-            &DataKey::Order(order_id),
-            TTL_THRESHOLD,
-            TTL_EXTEND_TO,
-        );
+        extend_persistent(env, &order_key);
+        extend_persistent(env, &DataKey::Order(order_id));
     }
     bump_instance(env);
 }
@@ -284,7 +292,8 @@ impl EscrowContract {
         load(&env, &DataKey::Escrow(seller, trade_id))
     }
 
-    /// Number of orders indexed since this contract instance was initialized.
+    /// Number of orders ever created on this deployment, including released and refunded
+    /// ones. Order indexes are `1..=order_count()`; this is not a count of active orders.
     pub fn order_count(env: Env) -> u64 {
         env.storage()
             .instance()
@@ -292,9 +301,16 @@ impl EscrowContract {
             .unwrap_or(0)
     }
 
-    /// Lists retained orders beginning at the 1-based order index `start`.
-    /// `limit` bounds the number of index entries scanned and must be at most 100.
+    /// Lists orders (any status) by creation index, scanning the 1-based slots
+    /// `start..start + limit`, clamped to `order_count()`. `start == 0` is `InvalidStart`;
+    /// `start > order_count()` gives an empty page. `limit` (1..=25) counts slots scanned,
+    /// not orders returned; the next page starts at `start + limit`.
+    /// An archived entry in the range is not skipped: the call needs a restore first.
+    /// Anyone can create orders with any token, so filter by the expected token.
     pub fn list_orders(env: Env, start: u64, limit: u32) -> Result<Vec<Escrow>, Error> {
+        if start == 0 {
+            return Err(Error::InvalidStart);
+        }
         if limit == 0 || limit > MAX_ORDER_PAGE_SIZE {
             return Err(Error::InvalidLimit);
         }
@@ -305,9 +321,12 @@ impl EscrowContract {
             .get::<_, u64>(&DataKey::NextOrder)
             .unwrap_or(0);
         let mut orders = Vec::new(&env);
-        let mut order_id = start.max(1);
-        let mut scanned = 0;
-        while order_id <= count && scanned < limit {
+        if start > count {
+            return Ok(orders);
+        }
+        // `limit >= 1` here, and saturating_add keeps `end` in range even near u64::MAX.
+        let end = start.saturating_add(u64::from(limit) - 1).min(count);
+        for order_id in start..=end {
             if let Some((seller, trade_id)) = env
                 .storage()
                 .persistent()
@@ -317,11 +336,6 @@ impl EscrowContract {
                     orders.push_back(escrow);
                 }
             }
-            scanned += 1;
-            if order_id == u64::MAX {
-                break;
-            }
-            order_id += 1;
         }
         Ok(orders)
     }

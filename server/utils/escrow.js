@@ -19,6 +19,13 @@ import { HttpError, badRequest } from './http.js';
 import { toStroops } from './stellar.js';
 
 export const ESCROW_STATUS = ['funded', 'released', 'refunded']; // índice = enum Status del contrato
+
+/**
+ * Contrato de escrow de un trade: el que quedó registrado en el propio trade (`escrow_contract_id`)
+ * si existe; si no, el configurado (ESCROW_CONTRACT_ID). Así, al cambiar de contrato (redeploy),
+ * lo ya registrado contra el contrato anterior se sigue comprobando contra ese contrato.
+ */
+export const escrowContractIdFor = (trade) => trade?.escrow_contract_id || config.stellar.escrowContractId;
 const CONTRACT_ERROR_NOT_FOUND = 2;
 // Margen para relojes: una tx no puede ser (mucho) anterior a la creación del trade.
 const CLOCK_SKEW_S = 120;

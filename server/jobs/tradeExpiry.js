@@ -15,7 +15,7 @@
 import { config } from '../config.js';
 import { logger as defaultLogger } from '../logger.js';
 import { pool as defaultPool } from '../db/pool.js';
-import { readEscrow } from '../utils/escrow.js';
+import { escrowContractIdFor, readEscrow } from '../utils/escrow.js';
 
 export const EXPIRY_LOCK_KEY = 72_340_173; // distinto del de migraciones (72_340_172)
 const BATCH = 200;
@@ -44,7 +44,7 @@ const EXPIRE_SQL = `
  * @param {object} [opts]
  * @param {import('pg').Pool} [opts.pool]
  * @param {number} [opts.ttlMs]
- * @param {(trade: {id: number, seller_address: string|null}) => Promise<boolean>} [opts.fundedOnChain]
+ * @param {(trade: {id: number, seller_address: string|null, escrow_contract_id: string|null}) => Promise<boolean>} [opts.fundedOnChain]
  *        true si el escrow existe on-chain (no expirar). Por defecto: Soroban RPC si VERIFY_STELLAR_TX.
  * @param {boolean} [opts.useLock] false solo en tests (para ejercitar la guarda SQL sin el lock).
  */
@@ -57,7 +57,7 @@ export async function expirePendingTrades({
 } = {}) {
   if (!ttlMs) return [];
   const { rows: candidates } = await pool.query(
-    `SELECT t.id, u.stellar_address AS seller_address
+    `SELECT t.id, t.escrow_contract_id, u.stellar_address AS seller_address
        FROM trades t JOIN users u ON u.id = t.seller_id
       WHERE t.status = 'pending' AND t.created_at < now() - make_interval(secs => $1::double precision / 1000)
       ORDER BY t.created_at
@@ -107,10 +107,10 @@ export async function expirePendingTrades({
   }
 }
 
-async function defaultFundedOnChain(trade) {
-  const { verifyTx, escrowContractId } = config.stellar;
-  if (!verifyTx || !escrowContractId || !trade.seller_address) return false;
-  return (await readEscrow({ contractId: escrowContractId, seller: trade.seller_address, tradeId: trade.id })) !== null;
+export async function defaultFundedOnChain(trade) {
+  const contractId = escrowContractIdFor(trade);
+  if (!config.stellar.verifyTx || !contractId || !trade.seller_address) return false;
+  return (await readEscrow({ contractId, seller: trade.seller_address, tradeId: trade.id })) !== null;
 }
 
 /**

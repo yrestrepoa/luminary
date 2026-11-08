@@ -1,5 +1,5 @@
 export const INPUT_CLASS =
-  'w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm outline-none transition focus:border-amber-300/50 disabled:opacity-60';
+  'w-full rounded-lg border border-white/10 bg-stellar-dark px-3 py-2 text-sm outline-none transition focus:border-stellar-yellow/50 disabled:opacity-60';
 
 /**
  * Campo de formulario con etiqueta, ayuda y error.
@@ -11,25 +11,25 @@ export default function FormField({ label, error, hint, as: Tag = 'input', class
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
   return (
     <div className={className}>
-      <label htmlFor={id} className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+      <label htmlFor={id} className="mb-1 block text-xs font-medium uppercase tracking-wide text-stellar-gray-muted">
         {label}
       </label>
       <Tag
         id={id}
         aria-invalid={Boolean(error) || undefined}
         aria-describedby={describedBy}
-        className={`${INPUT_CLASS} ${error ? 'border-rose-400/50' : ''}`}
+        className={`${INPUT_CLASS} ${error ? 'border-stellar-danger/50' : ''}`}
         {...props}
       >
         {children}
       </Tag>
       {error ? (
-        <p id={`${id}-error`} className="mt-1 text-xs text-rose-300">
+        <p id={`${id}-error`} className="mt-1 text-xs text-stellar-danger">
           {error}
         </p>
       ) : (
         hint && (
-          <p id={`${id}-hint`} className="mt-1 text-xs text-slate-500">
+          <p id={`${id}-hint`} className="mt-1 text-xs text-neutral-500">
             {hint}
           </p>
         )

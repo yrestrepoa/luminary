@@ -8,8 +8,8 @@ export default function NoticeBanner({ notice, onClose }) {
       role={notice.kind === 'ok' ? 'status' : 'alert'}
       className={`mb-6 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
         notice.kind === 'ok'
-          ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200'
-          : 'border-rose-400/20 bg-rose-400/10 text-rose-200'
+          ? 'border-stellar-teal/20 bg-stellar-teal/10 text-stellar-teal-light'
+          : 'border-stellar-danger/20 bg-stellar-danger/10 text-stellar-danger-light'
       }`}
     >
       <span>

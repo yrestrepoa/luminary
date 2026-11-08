@@ -1,1 +1,54 @@
 @import 'tailwindcss';
+
+/*
+ * Tokens de marca Stellar para Luminary (Tailwind v4, CSS-first).
+ * Cada `--color-*` genera las utilidades bg-/text-/border-/ring-… (p. ej. `bg-stellar-yellow`,
+ * `text-stellar-teal/80`); `--font-*` genera `font-sans` / `font-heading`.
+ */
+@theme {
+  --font-sans: 'Source Sans 3', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Rubik', ui-sans-serif, system-ui, sans-serif;
+
+  /* Superficies */
+  --color-stellar-dark: #0f0f0f; /* fondo principal */
+  --color-stellar-surface: #171717; /* tarjetas y paneles */
+  --color-stellar-gray: #262626; /* superficies secundarias */
+  --color-stellar-gray-light: #3a3a3a; /* bordes / hover de superficies */
+  --color-stellar-gray-muted: #a3a3a3; /* texto secundario sobre fondo oscuro */
+
+  /* Texto */
+  --color-stellar-light: #ffffff;
+  --color-stellar-cream: #fff6cd; /* texto sobre avisos amarillos */
+
+  /* Acento principal (CTA) */
+  --color-stellar-yellow: #fdda24;
+  --color-stellar-yellow-hover: #ffe45c; /* más luminoso sobre fondo oscuro */
+  --color-stellar-yellow-active: #e5c41a; /* pressed */
+
+  /* Red, confianza, escrow, estados de éxito */
+  --color-stellar-teal: #00a7b5;
+  --color-stellar-teal-hover: #14bfcd;
+  --color-stellar-teal-light: #8ae3ea; /* texto sobre avisos teal */
+
+  /* Errores y ventas */
+  --color-stellar-danger: #ff7a7a;
+  --color-stellar-danger-light: #ffb8b8; /* texto sobre avisos de error */
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-stellar-dark);
+    color: var(--color-stellar-light);
+    font-family: var(--font-sans);
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-heading);
+  }
+}

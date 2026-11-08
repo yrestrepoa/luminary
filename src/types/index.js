@@ -87,6 +87,19 @@
  */
 
 /**
+ * Pago reciente de una cuenta, normalizado desde Horizon (ver services/stellar/account.js).
+ * @typedef {Object} RecentPayment
+ * @property {string} id
+ * @property {string} hash           hash de la transacción
+ * @property {string} kind           tipo de operación de Horizon (payment, create_account…)
+ * @property {string} amount
+ * @property {string} asset          'XLM' o código del activo (p. ej. 'USDC')
+ * @property {string} counterparty   la otra cuenta del pago
+ * @property {boolean} incoming      true si la cuenta recibió el pago
+ * @property {string} createdAt      ISO 8601
+ */
+
+/**
  * Firmante de transacciones.
  * @typedef {Object} Signer
  * @property {string} publicKey

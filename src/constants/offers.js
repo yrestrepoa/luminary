@@ -18,7 +18,7 @@ export const FIAT_CURRENCIES = [
 ];
 
 export const OFFER_STATUS = {
-  active: { label: 'Activa', className: 'bg-emerald-400/10 text-emerald-300' },
-  paused: { label: 'Pausada', className: 'bg-amber-400/10 text-amber-300' },
-  closed: { label: 'Cerrada', className: 'bg-slate-400/10 text-slate-400' },
+  active: { label: 'Activa', className: 'bg-stellar-teal/10 text-stellar-teal-hover' },
+  paused: { label: 'Pausada', className: 'bg-stellar-yellow/10 text-stellar-yellow' },
+  closed: { label: 'Cerrada', className: 'bg-stellar-gray-muted/10 text-stellar-gray-muted' },
 };

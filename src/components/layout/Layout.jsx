@@ -7,10 +7,10 @@ import Spinner from '../common/Spinner.jsx';
 export default function Layout() {
   const { pathname } = useLocation();
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
+    <div className="min-h-screen bg-stellar-dark text-stellar-light antialiased">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-amber-300 focus:px-3 focus:py-2 focus:text-slate-950"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-stellar-yellow focus:px-3 focus:py-2 focus:text-stellar-dark"
       >
         Saltar al contenido
       </a>

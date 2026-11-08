@@ -2,11 +2,11 @@
 export const TRADE_STATUS = {
   pending: { label: 'Esperando depósito', className: 'bg-sky-400/10 text-sky-300' },
   funded: { label: 'USDC en escrow', className: 'bg-indigo-400/10 text-indigo-300' },
-  paid: { label: 'Pago enviado', className: 'bg-amber-400/10 text-amber-300' },
-  released: { label: 'Completada', className: 'bg-emerald-400/10 text-emerald-300' },
-  refunded: { label: 'Reembolsada', className: 'bg-slate-400/10 text-slate-300' },
-  cancelled: { label: 'Cancelada', className: 'bg-slate-400/10 text-slate-400' },
-  disputed: { label: 'En disputa', className: 'bg-rose-400/10 text-rose-300' },
+  paid: { label: 'Pago enviado', className: 'bg-stellar-yellow/10 text-stellar-yellow' },
+  released: { label: 'Completada', className: 'bg-stellar-teal/10 text-stellar-teal-hover' },
+  refunded: { label: 'Reembolsada', className: 'bg-stellar-gray-muted/10 text-neutral-300' },
+  cancelled: { label: 'Cancelada', className: 'bg-stellar-gray-muted/10 text-stellar-gray-muted' },
+  disputed: { label: 'En disputa', className: 'bg-stellar-danger/10 text-stellar-danger' },
 };
 
 export const TRADE_FILTERS = [

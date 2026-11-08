@@ -77,28 +77,28 @@ export default function Profile() {
         </Card>
 
         <Card title="Wallet Stellar">
-          <p className="mb-4 text-sm text-slate-400">
+          <p className="mb-4 text-sm text-stellar-gray-muted">
             La dirección vinculada es donde recibirás USDC y desde la que liberas tus ventas. Se toma de Freighter para
             evitar errores de copia.
           </p>
 
-          <div className="mb-4 rounded-xl bg-slate-950/50 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Dirección vinculada</p>
+          <div className="mb-4 rounded-xl bg-stellar-dark/50 p-4">
+            <p className="text-xs uppercase tracking-wide text-neutral-500">Dirección vinculada</p>
             {linked ? (
               <a
                 href={EXPLORER_ACCOUNT_URL + linked}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-1 block break-all font-mono text-sm hover:text-amber-200"
+                className="mt-1 block break-all font-mono text-sm hover:text-stellar-yellow-hover"
               >
                 {linked} ↗
               </a>
             ) : (
-              <p className="mt-1 text-sm text-slate-400">Ninguna</p>
+              <p className="mt-1 text-sm text-stellar-gray-muted">Ninguna</p>
             )}
           </div>
 
-          {walletError && <p className="mb-3 text-sm text-rose-300">{walletError}</p>}
+          {walletError && <p className="mb-3 text-sm text-stellar-danger">{walletError}</p>}
 
           <div className="flex flex-wrap gap-2">
             {!address ? (
@@ -113,7 +113,7 @@ export default function Profile() {
                 {linked ? 'Reemplazar por' : 'Vincular'} {address.slice(0, 4)}…{address.slice(-4)}
               </Button>
             ) : (
-              <p className="text-sm text-emerald-300">✓ Freighter coincide con tu dirección vinculada</p>
+              <p className="text-sm text-stellar-teal-hover">✓ Freighter coincide con tu dirección vinculada</p>
             )}
             {linked && (
               <Button

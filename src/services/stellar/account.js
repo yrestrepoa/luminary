@@ -25,6 +25,42 @@ export async function checkBalance(publicKey) {
   }
 }
 
+/**
+ * Normaliza un registro de `/accounts/{id}/payments` de Horizon desde el punto de vista de `publicKey`.
+ * @returns {import('../../types/index.js').RecentPayment}
+ */
+export function toPayment(record, publicKey) {
+  const isCreate = record.type === 'create_account';
+  const from = isCreate ? record.funder : record.from;
+  const to = isCreate ? record.account : record.to;
+  const incoming = to === publicKey;
+  return {
+    id: record.id,
+    hash: record.transaction_hash,
+    kind: record.type,
+    amount: isCreate ? record.starting_balance : record.amount,
+    asset: isCreate || record.asset_type === 'native' ? 'XLM' : record.asset_code,
+    counterparty: incoming ? from : to,
+    incoming,
+    createdAt: record.created_at,
+  };
+}
+
+/**
+ * Últimos pagos de una cuenta (XLM, USDC, creación de cuenta…), más recientes primero.
+ * Una cuenta aún no creada en la red devuelve [].
+ * @returns {Promise<import('../../types/index.js').RecentPayment[]>}
+ */
+export async function getRecentPayments(publicKey, limit = 5) {
+  try {
+    const page = await server.payments().forAccount(publicKey).order('desc').limit(limit).call();
+    return page.records.map((r) => toPayment(r, publicKey));
+  } catch (err) {
+    if (isNotFound(err)) return [];
+    throw err;
+  }
+}
+
 /** Fondea una cuenta de Testnet con XLM vía Friendbot. */
 export async function fundWithFriendbot(publicKey) {
   if (!FRIENDBOT_URL) throw new Error('Friendbot solo está disponible en testnet');

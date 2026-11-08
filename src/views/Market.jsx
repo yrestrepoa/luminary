@@ -60,16 +60,16 @@ export default function Market() {
       <section className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Mercado P2P <span className="text-amber-300">fiat ⇄ USDC</span>
+            Mercado P2P <span className="text-stellar-yellow">fiat ⇄ USDC</span>
           </h1>
-          <p className="mt-2 max-w-2xl text-slate-400">
+          <p className="mt-2 max-w-2xl text-stellar-gray-muted">
             Compra y vende USDC con tu moneda local, liquidado en Stellar Testnet.
           </p>
         </div>
         {isAuthenticated && (
           <Link
             to={ROUTES.createOffer}
-            className="rounded-xl bg-gradient-to-r from-amber-300 to-orange-500 px-5 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-orange-500/20 hover:brightness-110"
+            className="rounded-xl bg-stellar-yellow px-5 py-2.5 text-sm font-semibold text-stellar-dark hover:bg-stellar-yellow-hover active:bg-stellar-yellow-active"
           >
             + Publicar oferta
           </Link>
@@ -77,7 +77,7 @@ export default function Market() {
       </section>
 
       {data?.demo && (
-        <div className="mb-6 rounded-xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+        <div className="mb-6 rounded-xl border border-stellar-yellow/20 bg-stellar-yellow/10 px-4 py-3 text-sm text-stellar-cream">
           No se pudo conectar con la API: mostrando ofertas de demostración.
         </div>
       )}
@@ -95,7 +95,7 @@ export default function Market() {
           <EmptyState title="No hay ofertas activas" text="Sé el primero en publicar una.">
             <Link
               to={isAuthenticated ? ROUTES.createOffer : ROUTES.register}
-              className="text-sm font-medium text-amber-300 hover:text-amber-200"
+              className="text-sm font-medium text-stellar-yellow hover:text-stellar-yellow-hover"
             >
               Publicar oferta
             </Link>

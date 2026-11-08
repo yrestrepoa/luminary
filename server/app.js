@@ -13,6 +13,7 @@ import userRoutes from './routes/users.js';
 import offerRoutes from './routes/offers.js';
 import tradeRoutes from './routes/trades.js';
 import { HttpError } from './utils/http.js';
+import { forwardedForWarning } from './middleware/proxyWarning.js';
 
 /** Orígenes externos a los que la SPA se conecta directamente (Horizon, Soroban RPC, Friendbot). */
 function connectSources() {
@@ -74,11 +75,19 @@ export function createApp({ logger = defaultLogger, trustProxy = config.trustPro
   app.set('trust proxy', trustProxy);
 
   app.use(httpLogger(logger));
+  // Producción sin TRUST_PROXY explícito: avisa en cuanto se vea que hay un proxy delante.
+  if (config.isProd && !config.trustProxyExplicit) app.use(forwardedForWarning(logger));
   app.use(
     helmet({
       contentSecurityPolicy: {
         directives: {
           'connect-src': ["'self'", ...connectSources()],
+          // Fuentes autoalojadas (@fontsource, empaquetadas por Vite en /assets) y CSS solo
+          // desde ficheros propios: sin Google Fonts (filtraba la IP de cada visitante), sin
+          // `https:` genérico y sin 'unsafe-inline' (la SPA no usa estilos en línea). Si algún día
+          // hace falta un atributo style, mejor una clase de Tailwind que relajar esta directiva.
+          'style-src': ["'self'"],
+          'font-src': ["'self'"],
           // Sin upgrade-insecure-requests fuera de producción (permite probar por http://).
           'upgrade-insecure-requests': config.isProd ? [] : null,
         },

@@ -13,4 +13,4 @@ process.env.REDIS_URL = process.env.TEST_REDIS_URL ?? '';
 process.env.DB_POOL_MAX = '5';
 process.env.DB_CONNECTION_TIMEOUT_MS = '2000';
 // Contrato y token ficticios (formato válido) para las pruebas de escrow.
-process.env.ESCROW_CONTRACT_ID ??= 'CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI';
+process.env.ESCROW_CONTRACT_ID ??= 'CBWCY3KMNME5TKJTIRYNA3F32BJ6CG2UWIP7F6I6WYTK2HCAL23AWGKR';

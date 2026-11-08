@@ -98,7 +98,10 @@ router.post('/login', loginIpLimiter, loginAccountLimiter, async (req, res) => {
     .string('password', { min: 1, max: 72, trim: false })
     .done();
 
-  const user = await one(`SELECT ${USER_COLUMNS}, password_hash FROM users WHERE lower(email) = $1`, [email]);
+  const user = await one(
+    `SELECT ${USER_COLUMNS}, password_hash FROM users WHERE lower(email) = $1 AND deleted_at IS NULL`,
+    [email]
+  );
   const ok = await bcrypt.compare(password, user?.password_hash ?? DUMMY_HASH);
   if (!user || !ok) throw unauthorized('Email o contraseña incorrectos');
 

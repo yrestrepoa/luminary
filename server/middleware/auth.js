@@ -52,7 +52,8 @@ async function userFromRequest(req) {
   const id = Number(payload.sub);
   if (!Number.isSafeInteger(id) || id <= 0) return null;
   if (await revocations.isRevoked(payload.jti)) return null;
-  return one(`SELECT ${USER_COLUMNS} FROM users WHERE id = $1`, [id]);
+  // Cuentas eliminadas (anonimizadas, ver DELETE /api/users/me): ninguna sesión vale.
+  return one(`SELECT ${USER_COLUMNS} FROM users WHERE id = $1 AND deleted_at IS NULL`, [id]);
 }
 
 /** Exige sesión válida; deja el usuario en `req.user`. */

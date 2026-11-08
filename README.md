@@ -72,7 +72,8 @@ The API validates its environment at boot and exits with a list of every problem
 | `PORT` / `HOST` | API listen address (default `127.0.0.1:4000`). The Vite dev proxy reads `PORT`. |
 | `NODE_ENV` | `production` enables `Secure` cookies (requires HTTPS) and the production checks. |
 | `REDIS_URL` | e.g. `redis://127.0.0.1:6379`. Empty → in-memory fallback (single process only). |
-| `ESCROW_CONTRACT_ID` | Deployed `luminary-escrow` contract (`C…`). Testnet deployment: `CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI`. Without it, funding returns 503 when verification is on. |
+| `TRUST_PROXY` | **Set it behind any proxy.** Production default is `false` (`X-Forwarded-For` ignored), so behind a proxy every client gets the proxy's IP and the per-IP login/register limits treat all users as one. **Railway, or one reverse proxy / load balancer: `TRUST_PROXY=1`.** The API logs a warning at boot when it is unset in production, and another the first time a request arrives with `X-Forwarded-For`. Details: [proxy contract](docs/PRODUCTION.md#proxy-contract-x-forwarded-for-and-trust_proxy). |
+| `ESCROW_CONTRACT_ID` | Deployed `luminary-escrow` contract (`C…`). Testnet deployment: `CBWCY3KMNME5TKJTIRYNA3F32BJ6CG2UWIP7F6I6WYTK2HCAL23AWGKR` (has `order_count`/`list_orders`; the previous `CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI` only serves trades already funded on it, see [contract-luminary/README.md](contract-luminary/README.md#redeploy-done-2026-11)). Without it, funding returns 503 when verification is on. |
 | `VERIFY_STELLAR_TX` | `true` (default): every escrow step (fund / release / refund) is verified on-chain through Soroban RPC before the trade changes state. Set `false` **only** for local tests without network access (`npm run test:smoke`). |
 | `SOROBAN_RPC_URL` | Default `https://soroban-testnet.stellar.org`. |
 | `STELLAR_NETWORK_PASSPHRASE` | Default: Testnet. |
@@ -144,6 +145,7 @@ All routes are under `/api`. Mutations must send `Content-Type: application/json
 | POST | `/auth/logout` | – | Revokes the current JWT (`jti`) on the server and clears the cookie |
 | GET | `/auth/me` | ✔ | Current user |
 | PATCH | `/users/me` | ✔ | `{ displayName?, stellarAddress? }` (`null` unlinks the address) |
+| DELETE | `/users/me` | ✔ | `{ password }` → deletes my account (204). `409` while I have open trades. See [Account deletion](#account-deletion) |
 | GET | `/offers` | – | Active offers. Query: `type=buy\|sell`, `currency`, `limit` |
 | GET | `/offers/mine` | ✔ | My offers, any status |
 | GET | `/offers/:id` | – | Offer detail |
@@ -161,6 +163,15 @@ All routes are under `/api`. Mutations must send `Content-Type: application/json
 | POST | `/trades/:id/dispute` | ✔ party | Open a dispute after payment (resolved manually for now) |
 
 Offer `type: "sell"` means the creator sells USDC.
+
+### Account deletion
+
+`DELETE /api/users/me` with `{ password }` (the current password is required again; 5 wrong attempts per account per 15 min, then `429`).
+
+- **Open trades block deletion.** If the account is buyer or seller in any `pending`, `funded`, `paid` or `disputed` trade, the API answers `409` and changes nothing. Cancel the `pending` trades and release or refund the funded ones first: USDC in escrow can't be left behind.
+- **No trades ever:** the user row is deleted, and its offers with it.
+- **Only closed trades** (`released`, `refunded`, `cancelled`): the counterparty keeps its trade history, so the row is **anonymized** instead (email `deleted-<id>@deleted.invalid`, name `Cuenta eliminada`, unusable password, Stellar address unlinked, `deleted_at` set). The user's offers are closed. The email and Stellar address can be used again by a new account. On-chain data (escrows, payments) is public and can't be erased.
+- **Sessions:** the current JWT is revoked and the cookie cleared. Any other session of the account stops working at once, because sessions and logins ignore deleted or anonymized rows.
 
 ## Trade flow (on-chain escrow)
 

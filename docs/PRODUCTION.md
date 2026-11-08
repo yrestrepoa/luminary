@@ -159,6 +159,7 @@ the hops listed in `TRUST_PROXY`. Two rules, both required:
    their hop count so that only the entry they appended is used.
 2. **`TRUST_PROXY` = exactly the proxies in front of the API**, never more:
    - one reverse proxy (on the same host in front of the compose stack, or a single cloud load balancer) → `1` (compose default)
+   - **Railway** (the platform's edge proxy is the only hop in front of the service) → `1`. Set it in the service variables: unset, every user shares the edge's IP. To check it after deploying, the request logs (`req.ip`) must show different client IPs, not the same internal address for everyone.
    - proxy on the same host talking to a bare `node server/index.js` on loopback → `loopback`
    - proxy container in the compose network → its IP or subnet, e.g. `172.18.0.0/16`
    - CDN → load balancer → API → `2`
@@ -166,7 +167,7 @@ the hops listed in `TRUST_PROXY`. Two rules, both required:
 
 If `TRUST_PROXY` is too permissive, a client can rotate `X-Forwarded-For` and get a fresh per-IP budget on
 every request; if too strict, every user shares the proxy's IP and one abuser locks everybody out. The
-production default is `false` (safe, but the second failure mode), so set it. Independently of the proxy
+production default is `false` (safe, but the second failure mode), so set it. In production with `TRUST_PROXY` unset, the API warns at boot and again, once per process, on the first request that carries `X-Forwarded-For` (proof that a proxy is in front). Independently of the proxy
 setup, failed logins are also limited **per account** (lowercased email, 10 per 15 min, stored as a SHA-256
 hash), so rotating IPs does not help brute-forcing one account. The API port must only be reachable through
 the proxy (compose publishes it on `127.0.0.1` only); anyone who can reach it directly can choose the
@@ -305,13 +306,13 @@ browser error reporter (Sentry or similar) hooked into `ErrorBoundary`.
 - Build-time variables (`VITE_*`, see [`.env.production.example`](../.env.production.example)) are embedded in the public bundle: never put secrets there. In Docker pass them as `--build-arg`.
 - `VITE_STELLAR_NETWORK=mainnet` requires `VITE_SOROBAN_RPC_URL` and `VITE_USDC_ISSUER` (the browser logs a config error otherwise) and hides Friendbot. The escrow contract and token ids always come from the API (`trade.escrow`), so the server config is the source of truth for funds.
 - Routes are lazy-loaded; the Stellar SDK chunk (~630 kB, ~133 kB gzip) loads only on views that sign or read transactions. Initial load is ~222 kB JS (~73 kB gzip) vs 888 kB (215 kB gzip) before code-splitting. Hashed assets are served with `Cache-Control: immutable, max-age=1y`; `index.html` with `no-cache`.
-- CSP (from helmet): `script-src 'self'`, no inline scripts in the build, `connect-src` limited to `'self'` + Horizon/Soroban/Friendbot (+ `CSP_CONNECT_SRC`). If you serve the SPA from nginx instead of the API, copy the CSP header from an API response.
+- CSP (from helmet): `script-src 'self'`, no inline scripts in the build, `style-src 'self'` and `font-src 'self'` (fonts are self-hosted from `@fontsource/*` and bundled into `assets/`; no Google Fonts, so visitor IPs are not sent to a third party, and no inline styles: use Tailwind classes, not `style` attributes), `connect-src` limited to `'self'` + Horizon/Soroban/Friendbot (+ `CSP_CONNECT_SRC`). If you serve the SPA from nginx instead of the API, copy the CSP header from an API response.
 - Error boundaries show a reload prompt when a chunk from a previous deploy is gone; keep the previous release's `assets/` available for a while during deploys if possible.
 - No sourcemaps are emitted by default (`VITE_SOURCEMAP=true` to enable, e.g. for upload to an error tracker).
 
 ## Mainnet migration (escrow contract)
 
-The testnet contract `CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI` is for testing only.
+The testnet contracts (`CBWCY3KMNME5TKJTIRYNA3F32BJ6CG2UWIP7F6I6WYTK2HCAL23AWGKR`, and the previous `CA77HZ3YHCNKXG6M2OZKN7QAI7UDEEOX2AHDEQU5LO4DTD7QHI6K6BOI`) are for testing only.
 
 1. **Audit.** Commission an independent audit of `contract-luminary/contracts/escrow` (auth on `create`/`release`/`refund`, timeout logic, token handling, storage TTL/archival and rent). Fix findings, tag the audited commit.
 2. **Decide the open design points first** (see [Known limits](#known-limits)): refund timeout length, dispute/arbitration model, whether an admin/pausing mechanism is wanted. Changing them later means a new contract.

@@ -13,6 +13,7 @@ import userRoutes from './routes/users.js';
 import offerRoutes from './routes/offers.js';
 import tradeRoutes from './routes/trades.js';
 import { HttpError } from './utils/http.js';
+import { forwardedForWarning } from './middleware/proxyWarning.js';
 
 /** Orígenes externos a los que la SPA se conecta directamente (Horizon, Soroban RPC, Friendbot). */
 function connectSources() {
@@ -74,6 +75,8 @@ export function createApp({ logger = defaultLogger, trustProxy = config.trustPro
   app.set('trust proxy', trustProxy);
 
   app.use(httpLogger(logger));
+  // Producción sin TRUST_PROXY explícito: avisa en cuanto se vea que hay un proxy delante.
+  if (config.isProd && !config.trustProxyExplicit) app.use(forwardedForWarning(logger));
   app.use(
     helmet({
       contentSecurityPolicy: {

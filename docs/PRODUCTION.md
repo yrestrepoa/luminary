@@ -159,6 +159,7 @@ the hops listed in `TRUST_PROXY`. Two rules, both required:
    their hop count so that only the entry they appended is used.
 2. **`TRUST_PROXY` = exactly the proxies in front of the API**, never more:
    - one reverse proxy (on the same host in front of the compose stack, or a single cloud load balancer) → `1` (compose default)
+   - **Railway** (the platform's edge proxy is the only hop in front of the service) → `1`. Set it in the service variables: unset, every user shares the edge's IP. To check it after deploying, the request logs (`req.ip`) must show different client IPs, not the same internal address for everyone.
    - proxy on the same host talking to a bare `node server/index.js` on loopback → `loopback`
    - proxy container in the compose network → its IP or subnet, e.g. `172.18.0.0/16`
    - CDN → load balancer → API → `2`
@@ -166,7 +167,7 @@ the hops listed in `TRUST_PROXY`. Two rules, both required:
 
 If `TRUST_PROXY` is too permissive, a client can rotate `X-Forwarded-For` and get a fresh per-IP budget on
 every request; if too strict, every user shares the proxy's IP and one abuser locks everybody out. The
-production default is `false` (safe, but the second failure mode), so set it. Independently of the proxy
+production default is `false` (safe, but the second failure mode), so set it. In production with `TRUST_PROXY` unset, the API warns at boot and again, once per process, on the first request that carries `X-Forwarded-For` (proof that a proxy is in front). Independently of the proxy
 setup, failed logins are also limited **per account** (lowercased email, 10 per 15 min, stored as a SHA-256
 hash), so rotating IPs does not help brute-forcing one account. The API port must only be reachable through
 the proxy (compose publishes it on `127.0.0.1` only); anyone who can reach it directly can choose the
